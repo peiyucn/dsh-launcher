@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop } from './actions'
-import { clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, runDshUpdate } from './server'
+import { clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, runDshUpdate } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -155,7 +155,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       <button class="mini-btn" id="updateBtn" title="Update dsh">…</button>
     </div>
   </div>
-  <div class="card">
+  <div class="card" id="dsCard">
     <div class="ds-header">
       <span class="ds-title">DeepSeek API Status</span>
       <button class="ds-open" id="dsOpenBtn" title="status.deepseek.com (official DeepSeek status)">↗</button>
@@ -363,6 +363,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const log = document.getElementById('log')
       log.textContent = m.activity || '(no activity yet)'
       log.scrollTop = log.scrollHeight
+      const dsCard = document.getElementById('dsCard')
+      if (dsCard) dsCard.style.display = m.showDs === false ? 'none' : ''
       renderRunning(m.status)
       renderRequirements(m.status)
       renderDs(m.dsStatus)
@@ -397,7 +399,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await vscode.env.openExternal(vscode.Uri.parse('https://status.deepseek.com/'))
         break
       case 'openSettings':
-        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:local.dsh-launcher')
+        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:peiyucn.dsh-launcher')
         break
       case 'clearConsole':
         clearConsole()
@@ -429,10 +431,11 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const status = await currentStatus()
       const activity = getActivity()
       const browser = vscode.workspace.getConfiguration('dsh').get<string>('browser') ?? 'built-in'
-      const dsStatus = await getDsStatus()
+      const showDs = hasDeepSeekModel()
+      const dsStatus = showDs ? await getDsStatus() : undefined
       const consoleSize = getConsoleSize()
-      const balance = getDshBalance()
-      await this.view.webview.postMessage({ type: 'update', status, activity, browser, dsStatus, consoleSize, balance })
+      const balance = showDs ? getDshBalance() : undefined
+      await this.view.webview.postMessage({ type: 'update', status, activity, browser, dsStatus, consoleSize, balance, showDs })
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       console.error('[dsh-launcher] refresh failed:', error)

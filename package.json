@@ -67,7 +67,7 @@
           "type": "string",
           "enum": ["auto", "npm", "source"],
           "default": "auto",
-          "description": "How to run DeepSeek Harness. 'auto' prefers a source checkout, then falls back to npm; 'npm' forces 'npx @deepseek-ai/dsh web'; 'source' forces a local git clone via tsx."
+          "description": "How to run DeepSeek Harness. 'auto' and 'npm' both run 'npx @deepseek-ai/dsh web'; 'source' runs a local git clone via tsx (set dsh.path)."
         },
         "dsh.browser": {
           "type": "string",
@@ -83,7 +83,7 @@
         "dsh.path": {
           "type": "string",
           "default": "",
-          "description": "Path to dsh (the deepseek-harness checkout for source mode). Leave empty to auto-detect; the extension fills this in when it detects or you pick the location, and you can edit it manually."
+          "description": "Path to the deepseek-harness checkout for 'source' mode (must contain apps/cli/src/bin.ts). Leave empty unless you use source mode."
         },
         "dsh.nodePath": {
           "type": "string",

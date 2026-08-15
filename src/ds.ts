@@ -186,6 +186,41 @@ function readCredential(name: string): string | undefined {
   return undefined
 }
 
+/** Read the default Agent model selection from settings.yaml. */
+function readDefaultModel(): { provider: string; model: string } | undefined {
+  try {
+    const lines = fs.readFileSync(path.join(resolveDshHome(), 'settings.yaml'), 'utf8').split(/\r?\n/)
+    let section = ''
+    let provider = ''
+    let model = ''
+    for (const line of lines) {
+      const m = /^(\s*)([A-Za-z0-9_.-]+):\s*(.*)$/.exec(line)
+      if (!m) continue
+      if (m[1] === '') {
+        section = m[2]
+      } else if (section === 'agent-default-model') {
+        if (m[2] === 'provider') provider = m[3].trim()
+        else if (m[2] === 'model') model = m[3].trim()
+      }
+    }
+    if (provider || model) return { provider, model }
+  } catch {
+    // no settings file
+  }
+  return undefined
+}
+
+/**
+ * Whether DeepSeek is configured: the default Agent model uses a DeepSeek
+ * provider/model, or a DeepSeek API key is present. The panel shows the
+ * DeepSeek API status card only when this is true.
+ */
+export function hasDeepSeekModel(): boolean {
+  if (readCredential('DEEPSEEK_API_KEY')) return true
+  const sel = readDefaultModel()
+  return sel !== undefined && /deepseek/i.test(`${sel.provider} ${sel.model}`)
+}
+
 /** Query the DeepSeek account balance using the key configured in dsh. */
 export async function fetchDshBalance(): Promise<void> {
   const key = readCredential('DEEPSEEK_API_KEY')

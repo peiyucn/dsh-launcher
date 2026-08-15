@@ -28,7 +28,7 @@ import {
 
 // Re-export DeepSeek status/balance for the panel (kept in ds.ts so this
 // module stays focused on server lifecycle).
-export { fetchDshBalance, getDshBalance, getDsStatus } from './ds'
+export { fetchDshBalance, getDshBalance, getDsStatus, hasDeepSeekModel } from './ds'
 
 export type DshMode = 'auto' | 'npm' | 'source'
 
@@ -101,7 +101,10 @@ export function setLogPath(value: string): void {
   try {
     if (fs.existsSync(consolePath)) {
       const lines = fs.readFileSync(consolePath, 'utf8').split(/\r?\n/).filter((l) => l.length > 0)
-      for (const line of lines.slice(-LOG_RELOAD_LINES)) activity.push(line)
+      for (const line of lines.slice(-LOG_RELOAD_LINES)) {
+        if (line.includes('[dbg]')) continue
+        activity.push(line)
+      }
     }
   } catch {
     // best effort
@@ -112,9 +115,16 @@ export function getLogPath(): string {
   return logPath
 }
 
-/** Append a diagnostic line to the console feed (and the single log file). */
+/** Append a diagnostic line to the log file only (kept out of the console feed). */
 export function dbg(line: string): void {
-  addActivity('[dbg] ' + line)
+  const entry = `[${new Date().toLocaleTimeString()}] [dbg] ${line}`
+  if (consolePath) {
+    try {
+      fs.appendFileSync(consolePath, entry + '\n')
+    } catch {
+      // best effort
+    }
+  }
 }
 
 function pushActivity(entry: string): void {
@@ -233,7 +243,7 @@ function findSourceCheckout(cfg: DshConfig): string | undefined {
   return undefined
 }
 
-/** Persist the detected dsh path into the dsh.path setting (idempotent). */
+/** Persist the picked dsh path into the dsh.path setting (idempotent). */
 async function saveDshPath(value: string): Promise<void> {
   const c = vscode.workspace.getConfiguration('dsh')
   if ((c.get<string>('path') ?? '') !== value) {
@@ -260,19 +270,21 @@ async function pickRepoFolder(): Promise<string | undefined> {
   return dir
 }
 
-/** Detect the local dsh version: source checkout first, then the ~/.dsh link. */
+/** Detect the local dsh version: a source checkout (source mode), else the installed package. */
 async function detectDshVersion(cfg: DshConfig): Promise<void> {
-  try {
-    const checkout = findSourceCheckout(cfg)
-    if (checkout) {
-      const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'apps', 'cli', 'package.json'), 'utf8'))
-      if (pkg?.version) {
-        dshVersion = pkg.version
-        return
+  if (cfg.mode === 'source') {
+    try {
+      const checkout = findSourceCheckout(cfg)
+      if (checkout) {
+        const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'apps', 'cli', 'package.json'), 'utf8'))
+        if (pkg?.version) {
+          dshVersion = pkg.version
+          return
+        }
       }
+    } catch {
+      // fall through to installed package
     }
-  } catch {
-    // fall through to installed package
   }
   try {
     const link = path.join(resolveDshHome(), 'profiles', 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
@@ -293,13 +305,12 @@ export interface DshDetection {
   path: string
 }
 
-/** Detect dsh: source checkout first, otherwise the official npm method. */
+/** Detect dsh: source mode uses a checkout; npm/auto use the official npm method. */
 async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
-  const checkout = findSourceCheckout(cfg)
-  if (checkout) {
-    // Auto-fill dsh.path when the user hasn't set one yet.
-    if (!cfg.path) void saveDshPath(checkout)
-    return { state: 'ok', source: 'source', path: checkout }
+  if (cfg.mode === 'source') {
+    const checkout = findSourceCheckout(cfg)
+    if (checkout) return { state: 'ok', source: 'source', path: checkout }
+    return { state: 'missing', source: '', path: '' }
   }
   if (await findOnPath('npx')) return { state: 'ok', source: 'npm', path: '' }
   return { state: 'missing', source: '', path: '' }
@@ -647,22 +658,8 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     return waitForPort(cfg, START_TIMEOUT_MS)
   }
 
-  if (cfg.mode === 'npm') {
-    spawnNpm(cfg)
-    return waitForPort(cfg, START_TIMEOUT_MS)
-  }
-
-  // auto: prefer a source checkout, otherwise the official npx method
-  const repoPath = findSourceCheckout(cfg)
-  if (repoPath) {
-    if (!(await ensureCheckoutReady(repoPath))) {
-      dshState = 'missing'
-      return false
-    }
-    spawnSource(repoPath, cfg)
-  } else {
-    spawnNpm(cfg)
-  }
+  // npm and auto both use the official npx method (source needs explicit opt-in)
+  spawnNpm(cfg)
   return waitForPort(cfg, START_TIMEOUT_MS)
 }
 
