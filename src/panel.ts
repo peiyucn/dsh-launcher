@@ -72,6 +72,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: background .12s, border-color .12s, color .12s; }
   button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); flex: 1; }
   button.primary:hover { background: var(--vscode-button-hoverBackground); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary:disabled:hover { background: var(--vscode-button-background); }
   button.secondary { background: transparent; color: var(--vscode-foreground); border: 1px solid var(--vscode-panel-border); }
   button.secondary:hover { background: var(--vscode-toolbar-hoverBackground); }
   button.danger:hover { border-color: #f85149; color: #f85149; background: rgba(248,81,73,.1); }
@@ -252,9 +254,11 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         if (justStarted) statusSub.textContent = 'Waited 0s'
         dot.className = 'dot working'
         statusText.textContent = 'Starting DeepSeek Harness…'
-        startBtn.textContent = '▶ Start'
+        startBtn.textContent = 'Starting…'
+        startBtn.disabled = true
       } else {
         stopElapsed()
+        startBtn.disabled = false
         dot.className = 'dot' + (running ? ' running' : '')
         statusText.textContent = running ? 'Running' : 'Stopped'
         statusSub.textContent = running ? (status.url || '') : ''
@@ -334,7 +338,11 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     }
 
     document.querySelectorAll('button[data-cmd]').forEach((b) => {
-      b.addEventListener('click', () => vscode.postMessage({ command: b.dataset.cmd }))
+      b.addEventListener('click', () => {
+        // Gray the Start button instantly; the next status update re-enables it.
+        if (b.dataset.cmd === 'start') b.disabled = true
+        vscode.postMessage({ command: b.dataset.cmd })
+      })
     })
     document.getElementById('updateBtn').addEventListener('click', () => vscode.postMessage({ command: 'updateDsh' }))
     document.getElementById('dsOpenBtn').addEventListener('click', () => vscode.postMessage({ command: 'openStatus' }))
