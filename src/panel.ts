@@ -134,13 +134,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       </div>
     </div>
     <div class="runtime-path-block" id="runtimePathBlock">
+      <div class="runtime-row" id="runtimeDataRow">
+        <span class="runtime-label">data</span>
+        <span class="runtime-data" id="runtimeData"></span>
+      </div>
       <div class="runtime-row" id="runtimePathRow">
         <span class="runtime-label">path</span>
         <span class="runtime-path" id="runtimePath"></span>
-      </div>
-      <div class="runtime-row">
-        <span class="runtime-label">data</span>
-        <span class="runtime-data" id="runtimeData"></span>
       </div>
     </div>
   </div>
@@ -244,6 +244,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
       const startBtn = document.getElementById('startBtn')
+      const runtimePathRow = document.getElementById('runtimePathRow')
       const runtimePath = document.getElementById('runtimePath')
       const runtimeData = document.getElementById('runtimeData')
       if (starting) {
@@ -263,24 +264,28 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.querySelectorAll('.mode-option').forEach((b) => {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
-      // Both runtime rows are always rendered (path above data) so the
-      // layout never jumps when switching modes; use '—' as the empty
-      // placeholder.
-      if (mode === 'source' && !status.dshPath) {
-        // Source mode without a checkout: invite the user to configure it
-        // (clicking opens the extension settings).
-        runtimePath.textContent = '⚠ not configured — click to set dsh.path'
-        runtimePath.title = 'Open extension settings'
-        runtimePath.classList.add('missing')
-        runtimePath.dataset.openSettings = '1'
-      } else {
-        runtimePath.textContent = status.dshPathShort || '—'
-        runtimePath.title = status.dshPath || ''
-        runtimePath.classList.remove('missing')
-        delete runtimePath.dataset.openSettings
-      }
+      // data is always shown (top row); the path row only exists in source
+      // mode and stays hidden under npx, where there is no local checkout.
       runtimeData.textContent = status.dshHomeShort || '—'
       runtimeData.title = status.dshHome || ''
+      if (mode === 'source') {
+        runtimePathRow.style.display = ''
+        if (!status.dshPath) {
+          // No checkout configured: invite the user to configure it
+          // (clicking opens the extension settings).
+          runtimePath.textContent = '⚠ not configured — click to set dsh.path'
+          runtimePath.title = 'Open extension settings'
+          runtimePath.classList.add('missing')
+          runtimePath.dataset.openSettings = '1'
+        } else {
+          runtimePath.textContent = status.dshPathShort || ''
+          runtimePath.title = status.dshPath || ''
+          runtimePath.classList.remove('missing')
+          delete runtimePath.dataset.openSettings
+        }
+      } else {
+        runtimePathRow.style.display = 'none'
+      }
     }
 
     function renderRequirements(status) {
