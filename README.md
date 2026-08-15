@@ -46,8 +46,6 @@ By default the extension runs dsh via `npx @deepseek-ai/dsh web` — no dsh inst
 
 Click the DSH Launcher icon in the activity bar, then click **Start**.
 
-<img src="resources/icon.png" width="40" alt="DSH Launcher activity bar icon">
-
 ## Settings
 
 Settings → search "dsh":
