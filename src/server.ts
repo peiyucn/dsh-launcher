@@ -103,6 +103,7 @@ export function readConfig(): DshConfig {
 /** Persist the run mode chosen in the panel toggle and apply it immediately. */
 export async function applyMode(mode: 'npx' | 'source'): Promise<void> {
   selectedMode = mode
+  detectionCache = undefined
   await vscode.workspace.getConfiguration('dsh').update('mode', mode, vscode.ConfigurationTarget.Global)
 }
 

@@ -57,6 +57,12 @@
     "configuration": {
       "title": "DSH Launcher",
       "properties": {
+        "dsh.mode": {
+          "type": "string",
+          "enum": ["npx", "source"],
+          "default": "npx",
+          "description": "How to run DeepSeek Harness: 'npx' runs 'npx @deepseek-ai/dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
+        },
         "dsh.browser": {
           "type": "string",
           "enum": ["built-in", "external"],
