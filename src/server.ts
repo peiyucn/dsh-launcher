@@ -728,6 +728,12 @@ export function stopServer(): Promise<boolean> {
   return exclusive(stopServerUnlocked)
 }
 
+/** Whether the dsh server port is open (fast probe). */
+export async function isServerRunning(): Promise<boolean> {
+  const cfg = readConfig()
+  return isPortOpen(cfg.host, cfg.port)
+}
+
 /** Check for a newer dsh version (source mode only: git commits ahead of upstream). */
 async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
   if (cfg.mode !== 'source') return { hasUpdate: false, label: '' }

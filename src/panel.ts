@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, runDshUpdate } from './server'
+import { applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, runDshUpdate } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -421,7 +421,19 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         break
       case 'setMode':
         if (message.value === 'npm' || message.value === 'source') {
+          const wasRunning = await isServerRunning()
           await applyMode(message.value)
+          if (wasRunning) {
+            const pick = await vscode.window.showInformationMessage(
+              `DeepSeek Harness is running — restart with ${message.value} mode?`,
+              'Restart',
+              'Cancel',
+            )
+            if (pick === 'Restart') {
+              await actionStop()
+              await actionStart()
+            }
+          }
         }
         break
       case 'revealPath':
