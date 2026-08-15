@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { actionSetBrowser, actionStart, actionStop } from './actions'
+import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
 import { clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, runDshUpdate } from './server'
 
 function getNonce(): string {
@@ -429,7 +429,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         if (message.value) await actionSetBrowser(message.value)
         break
       case 'openStatus':
-        await vscode.env.openExternal(vscode.Uri.parse('https://status.deepseek.com/'))
+        await openUrl('https://status.deepseek.com/')
         break
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:peiyucn.dsh-launcher-vscode')

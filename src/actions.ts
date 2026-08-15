@@ -2,18 +2,18 @@ import * as fs from 'node:fs'
 import * as vscode from 'vscode'
 import { ensureRunning, getLogPath, readConfig, stopServer, uiUrl } from './server'
 
-/** Open the UI per dsh.browser: built-in (with fallback) or external. */
-async function openBrowser(): Promise<void> {
+/** Open a URL per dsh.browser: built-in Simple Browser (with fallback) or external. */
+export async function openUrl(url: string): Promise<void> {
   const browser = vscode.workspace.getConfiguration('dsh').get<string>('browser') ?? 'built-in'
   if (browser === 'external') {
-    await vscode.env.openExternal(vscode.Uri.parse(uiUrl()))
+    await vscode.env.openExternal(vscode.Uri.parse(url))
     return
   }
   try {
-    await vscode.commands.executeCommand('simpleBrowser.show', uiUrl())
+    await vscode.commands.executeCommand('simpleBrowser.show', url)
   } catch {
     void vscode.window.showInformationMessage('VS Code built-in browser is unavailable; opened the system browser instead.')
-    await vscode.env.openExternal(vscode.Uri.parse(uiUrl()))
+    await vscode.env.openExternal(vscode.Uri.parse(url))
   }
 }
 
@@ -37,7 +37,7 @@ export async function actionStart(): Promise<void> {
     }
     // Always (re)open the browser — DSH is fine with multiple pages, and this
     // way a closed tab can always be reopened by clicking again.
-    await openBrowser()
+    await openUrl(uiUrl())
   } finally {
     starting = false
   }
