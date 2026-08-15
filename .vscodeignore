@@ -1,6 +1,7 @@
 .vscode/**
 .gitignore
 .github/**
+AGENTS.md
 src/**
 tsconfig.json
 package-lock.json
