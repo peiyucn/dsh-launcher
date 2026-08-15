@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Package extension
+        run: |
+          mkdir -p releases
+          npx --yes @vscode/vsce package --no-dependencies --out releases/
+
+      - name: Publish to VS Code Marketplace
+        run: npx --yes @vscode/vsce publish --no-dependencies --packagePath releases/*.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## ${{ github.ref_name }}
+
+            See [CHANGELOG](https://github.com/peiyucn/dsh-launcher/blob/master/CHANGELOG.md) and [README](https://github.com/peiyucn/dsh-launcher#readme).
+          files: releases/*.vsix
