@@ -53,6 +53,7 @@
 
 * **Node.js** — 22.19+（或 >= 24）
 * **VS Code** — 1.85+
+* **bash** — 可选；仅 dsh 极简模式需要（该模式用 bash 而非 PowerShell）
 
 ## License
 
