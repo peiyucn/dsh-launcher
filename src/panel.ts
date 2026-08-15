@@ -65,7 +65,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .runtime-path-block { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
   .runtime-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .runtime-label { flex: none; width: 30px; color: var(--vscode-descriptionForeground); font-size: 10px; opacity: .65; }
-  .runtime-path, .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; font-family: var(--vscode-editor-font-family); min-width: 0; }
+  .runtime-path, .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; font-family: var(--vscode-editor-font-family); min-width: 0; cursor: pointer; }
+  .runtime-path:hover, .runtime-data:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
   .buttons { display: flex; gap: 8px; }
   button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: background .12s, border-color .12s, color .12s; }
   button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); flex: 1; }
@@ -263,8 +264,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
       runtimePathRow.style.display = status.dshPath ? '' : 'none'
-      runtimePath.textContent = status.dshPath || ''
-      runtimeData.textContent = status.dshHome || ''
+      runtimePath.textContent = status.dshPathShort || ''
+      runtimePath.title = status.dshPath || ''
+      runtimeData.textContent = status.dshHomeShort || ''
+      runtimeData.title = status.dshHome || ''
     }
 
     function renderRequirements(status) {
@@ -324,6 +327,12 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     })
     document.querySelectorAll('.mode-option').forEach((b) => {
       b.addEventListener('click', () => vscode.postMessage({ command: 'setMode', value: b.dataset.mode }))
+    })
+    document.querySelectorAll('.runtime-path, .runtime-data').forEach((el) => {
+      el.addEventListener('click', () => {
+        const full = el.getAttribute('title')
+        if (full) vscode.postMessage({ command: 'revealPath', value: full })
+      })
     })
 
     let refreshingReqs = false
@@ -410,6 +419,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
           await vscode.workspace.getConfiguration('dsh').update('mode', message.value, vscode.ConfigurationTarget.Global)
         }
         break
+      case 'revealPath':
+        if (message.value) void vscode.env.openExternal(vscode.Uri.file(message.value))
+        break
       case 'balance':
         await fetchDshBalance()
         break
@@ -463,7 +475,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       try {
         await this.view.webview.postMessage({
           type: 'update',
-          status: { running: false, starting: false, url: '', node: 'unknown', dsh: 'unknown', dshVersion: '', dshSource: '', dshPath: '', dshHome: '', nodeVersion: '' },
+          status: { running: false, starting: false, url: '', node: 'unknown', dsh: 'unknown', dshVersion: '', dshSource: '', dshPath: '', dshHome: '', dshPathShort: '', dshHomeShort: '', nodeVersion: '' },
           activity: `✗ Status refresh failed: ${msg}`,
           browser: 'built-in',
           consoleSize: 0,

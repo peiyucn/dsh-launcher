@@ -18,6 +18,7 @@ import {
   STOP_POLL_PROBE_MS,
   findOnPath,
   isProcessAlive,
+  maskPath,
   psQuote,
   quoteCmdArg,
   resolveDshHome,
@@ -52,6 +53,8 @@ export interface ServerStatus {
   dshSource: string
   dshPath: string
   dshHome: string
+  dshPathShort: string
+  dshHomeShort: string
   nodeVersion: string
   mode: 'npm' | 'source'
   update: DshUpdate | undefined
@@ -790,6 +793,7 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshState = 'ok'
   }
 
+  const dshHome = resolveDshHome()
   return {
     running,
     starting,
@@ -799,7 +803,9 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshVersion,
     dshSource,
     dshPath,
-    dshHome: resolveDshHome(),
+    dshHome,
+    dshPathShort: maskPath(dshPath),
+    dshHomeShort: maskPath(dshHome),
     nodeVersion,
     mode: cfg.mode === 'source' ? 'source' : 'npm',
     update: updateCache?.update,

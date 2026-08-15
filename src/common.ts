@@ -92,3 +92,12 @@ export async function findOnPath(cmd: string): Promise<string | undefined> {
   const first = result.stdout.trim().split(/\r?\n/)[0]
   return first || undefined
 }
+
+/** Abbreviate a path for display: keep the drive and the last segment, mask the middle. */
+export function maskPath(p: string): string {
+  if (!p) return ''
+  const segs = p.split(/[\\/]+/).filter(Boolean)
+  if (segs.length <= 3) return p
+  if (/^[A-Za-z]:$/.test(segs[0])) return segs[0] + '\\…\\' + segs[segs.length - 1]
+  return '…/' + segs[segs.length - 1]
+}
