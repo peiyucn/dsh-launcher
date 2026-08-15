@@ -57,12 +57,6 @@
     "configuration": {
       "title": "DSH Launcher",
       "properties": {
-        "dsh.mode": {
-          "type": "string",
-          "enum": ["auto", "npm", "source"],
-          "default": "auto",
-          "description": "How to run DeepSeek Harness. 'auto' and 'npm' both run 'npx @deepseek-ai/dsh web'; 'source' runs a local git clone via tsx (set dsh.path)."
-        },
         "dsh.browser": {
           "type": "string",
           "enum": ["built-in", "external"],

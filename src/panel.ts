@@ -59,10 +59,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .status-main { font-weight: 600; }
   .status-sub { color: var(--vscode-descriptionForeground); font-size: 11px; word-break: break-all; }
-  .mode-badge { margin-left: auto; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); border-radius: 4px; padding: 1px 7px; font-size: 10px; flex: none; }
-  .runtime-path-block { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; flex-direction: column; gap: 2px; }
-  .runtime-path { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; }
-  .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; opacity: .8; }
+  .mode-toggle { display: flex; margin-left: auto; background: var(--vscode-input-background); border: 1px solid var(--vscode-panel-border); border-radius: 999px; padding: 2px; gap: 2px; flex: none; }
+  .mode-option { border: none; border-radius: 999px; padding: 3px 10px; background: transparent; color: var(--vscode-descriptionForeground); cursor: pointer; font-size: 11px; font-weight: 600; font-family: inherit; transition: background .12s, color .12s; }
+  .mode-option.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  .runtime-path-block { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .runtime-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .runtime-label { flex: none; width: 30px; color: var(--vscode-descriptionForeground); font-size: 10px; opacity: .65; }
+  .runtime-path, .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; font-family: var(--vscode-editor-font-family); min-width: 0; }
   .buttons { display: flex; gap: 8px; }
   button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: background .12s, border-color .12s, color .12s; }
   button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); flex: 1; }
@@ -123,11 +126,20 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-main" id="statusText">Checking…</span>
         <span class="status-sub" id="statusSub"></span>
       </div>
-      <span class="mode-badge" id="modeBadge"></span>
+      <div class="mode-toggle" id="modeToggle">
+        <button class="mode-option" data-mode="npm">npm</button>
+        <button class="mode-option" data-mode="source">source</button>
+      </div>
     </div>
     <div class="runtime-path-block" id="runtimePathBlock">
-      <span class="runtime-path" id="runtimePath"></span>
-      <span class="runtime-data" id="runtimeData"></span>
+      <div class="runtime-row" id="runtimePathRow">
+        <span class="runtime-label">path</span>
+        <span class="runtime-path" id="runtimePath"></span>
+      </div>
+      <div class="runtime-row">
+        <span class="runtime-label">data</span>
+        <span class="runtime-data" id="runtimeData"></span>
+      </div>
     </div>
   </div>
   <div class="buttons">
@@ -138,7 +150,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     <div class="req-header">
       <span class="req-title">Requirements</span>
       <span class="req-hint" id="refreshHint"></span>
-      <button class="icon-btn" id="refreshBtn" title="Re-check Node / DSH / DeepSeek API">⟳</button>
+      <button class="icon-btn" id="refreshBtn" title="Re-check Node / DSH / updates">⟳</button>
     </div>
     <div class="req-row">
       <span class="req-name">Node</span>
@@ -152,7 +164,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="update-row" id="updateRow" style="display:none">
       <span class="req-name">Update</span>
-      <button class="mini-btn" id="updateBtn" title="Check for dsh updates">Update</button>
+      <button class="mini-btn" id="updateBtn" title="Pull dsh update">Update</button>
     </div>
   </div>
   <div class="card" id="dsCard">
@@ -230,7 +242,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
       const startBtn = document.getElementById('startBtn')
-      const modeBadge = document.getElementById('modeBadge')
+      const runtimePathRow = document.getElementById('runtimePathRow')
       const runtimePath = document.getElementById('runtimePath')
       const runtimeData = document.getElementById('runtimeData')
       if (starting) {
@@ -246,12 +258,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         statusSub.textContent = running ? (status.url || '') : ''
         startBtn.textContent = running ? '↗ New Tab' : '▶ Start'
       }
-      const mode = status.dshSource === 'source' ? 'source run' : status.dshSource === 'npm' ? 'npm run' : ''
-      modeBadge.textContent = mode
-      modeBadge.style.display = mode ? '' : 'none'
+      const mode = status.mode === 'source' ? 'source' : 'npm'
+      document.querySelectorAll('.mode-option').forEach((b) => {
+        b.classList.toggle('active', b.dataset.mode === mode)
+      })
+      runtimePathRow.style.display = status.dshPath ? '' : 'none'
       runtimePath.textContent = status.dshPath || ''
-      runtimePath.style.display = status.dshPath ? '' : 'none'
-      runtimeData.textContent = status.dshHome ? ('data · ' + status.dshHome) : ''
+      runtimeData.textContent = status.dshHome || ''
     }
 
     function renderRequirements(status) {
@@ -261,8 +274,15 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       setMark('req-node', status.node)
       setMark('req-dsh', status.dsh)
 
+      const upd = status.update
       const updateRow = document.getElementById('updateRow')
-      updateRow.style.display = status.dshSource === 'source' ? '' : 'none'
+      const updateBtn = document.getElementById('updateBtn')
+      if (upd && upd.hasUpdate) {
+        updateRow.style.display = ''
+        updateBtn.textContent = 'Update to ' + upd.label
+      } else {
+        updateRow.style.display = 'none'
+      }
     }
 
     function renderDs(ds) {
@@ -301,6 +321,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     document.getElementById('clearConsoleBtn').addEventListener('click', () => vscode.postMessage({ command: 'clearConsole' }))
     document.getElementById('browserSelect').addEventListener('change', (e) => {
       vscode.postMessage({ command: 'setBrowser', value: e.target.value })
+    })
+    document.querySelectorAll('.mode-option').forEach((b) => {
+      b.addEventListener('click', () => vscode.postMessage({ command: 'setMode', value: b.dataset.mode }))
     })
 
     let refreshingReqs = false
@@ -380,7 +403,12 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await runDshUpdate()
         break
       case 'refreshRequirements':
-        clearRequirementsCaches()
+        await clearRequirementsCaches()
+        break
+      case 'setMode':
+        if (message.value === 'npm' || message.value === 'source') {
+          await vscode.workspace.getConfiguration('dsh').update('mode', message.value, vscode.ConfigurationTarget.Global)
+        }
         break
       case 'balance':
         await fetchDshBalance()
