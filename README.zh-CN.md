@@ -47,7 +47,7 @@
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在dsh里配置了 DeepSeek 模型时才会显示。
-* 日志文件：`%APPDATA%\Code\User\globalStorage\peiyucn.dsh-launcher-vscode\dsh.log`
+* 日志文件：`%TEMP%\dsh-launcher-vscode.log`
 
 ## 环境
 

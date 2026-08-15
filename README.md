@@ -47,7 +47,7 @@ Settings → search "dsh":
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **API Status** card supports DeepSeek only for now — it is hidden unless a DeepSeek model is configured in dsh.
-* Log file: `%APPDATA%\Code\User\globalStorage\peiyucn.dsh-launcher-vscode\dsh.log`
+* Log file: `%TEMP%\dsh-launcher-vscode.log`
 
 ## Environment
 
