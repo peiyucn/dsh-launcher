@@ -21,15 +21,8 @@
 * **启动 / 停止** — 通过 `npx` 运行 dsh，并在就绪后打开 Web UI。
 * **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为检出目录（需包含 `apps/cli/src/bin.ts`）。
 * **仪表盘面板** — 服务状态、实时控制台、DeepSeek 官方 API 状态以及你的账户余额。
-* **DSH 更新** — 仅源码运行时出现：检测到新版本时显示按钮，点击执行 `git pull`。
+* **DSH 更新** — 仅源码运行：点击 Update 按钮检查上游，发现新提交时拉取。
 * **浏览器选择** — 内置浏览器或系统浏览器。
-* **Windows 下无控制台闪烁**（隐藏控制台）。
-
-## 前置条件
-
-### DeepSeek API Key
-
-<https://platform.deepseek.com>（运行 agent 时 Web UI 需要它）
 
 ## 使用方法
 

@@ -16,7 +16,6 @@ import {
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
-  UPDATE_CACHE_TTL_MS,
   findOnPath,
   isProcessAlive,
   psQuote,
@@ -54,12 +53,6 @@ export interface ServerStatus {
   dshPath: string
   dshHome: string
   nodeVersion: string
-  update: DshUpdate | undefined
-}
-
-export interface DshUpdate {
-  hasUpdate: boolean
-  label: string
 }
 
 let trackedChild: ChildProcess | undefined
@@ -713,31 +706,7 @@ export function stopServer(): Promise<boolean> {
   return exclusive(stopServerUnlocked)
 }
 
-/** Check for a newer dsh version (source mode only: git commits ahead of upstream). */
-async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
-  if (cfg.mode !== 'source') return { hasUpdate: false, label: '' }
-  const checkout = findSourceCheckout(cfg)
-  if (!checkout) return { hasUpdate: false, label: '' }
-  await runFile('git', ['-C', checkout, 'fetch'])
-  const r = await runFile('git', ['-C', checkout, 'rev-list', '--count', 'HEAD..@{upstream}'])
-  if (!r.ok) return { hasUpdate: false, label: '' }
-  const count = Number(r.stdout.trim())
-  if (!Number.isFinite(count) || count <= 0) return { hasUpdate: false, label: '' }
-  // Prefer the upstream version number; fall back to the commit count.
-  let label = `${count} commit${count === 1 ? '' : 's'}`
-  const v = await runFile('git', ['-C', checkout, 'show', '@{upstream}:apps/cli/package.json'])
-  if (v.ok) {
-    try {
-      const pkg = JSON.parse(v.stdout)
-      if (pkg?.version) label = `v${pkg.version}`
-    } catch {
-      // keep the commit-count label
-    }
-  }
-  return { hasUpdate: true, label }
-}
-
-/** Update dsh (source mode only: git pull for the configured checkout). */
+/** Update dsh (source mode only): check upstream, then pull when newer commits exist. */
 export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
   if (cfg.mode !== 'source') {
@@ -751,17 +720,35 @@ export async function runDshUpdate(): Promise<void> {
     void vscode.window.showWarningMessage('Set dsh.path to the source checkout to update it.')
     return
   }
+  addActivity('↑ Checking for dsh updates…')
+  await runFile('git', ['-C', checkout, 'fetch'])
+  const r = await runFile('git', ['-C', checkout, 'rev-list', '--count', 'HEAD..@{upstream}'])
+  if (!r.ok) {
+    addActivity('↑ Cannot check for dsh updates (no upstream)')
+    void vscode.window.showWarningMessage('Cannot check for dsh updates (git has no upstream).')
+    return
+  }
+  const count = Number(r.stdout.trim())
+  if (!Number.isFinite(count) || count <= 0) {
+    addActivity('↑ dsh is up to date')
+    void vscode.window.showInformationMessage('dsh is up to date.')
+    return
+  }
+  const pick = await vscode.window.showInformationMessage(
+    `Found ${count} new commit${count === 1 ? '' : 's'}. Pull now?`,
+    'Update',
+    'Cancel',
+  )
+  if (pick !== 'Update') return
   addActivity('↑ Updating dsh (git pull)…')
   const ok = await runInTerminal('Update DeepSeek Harness', `git -C "${checkout}" pull`)
   addActivity(ok ? '↑ dsh updated' : '↑ dsh update failed')
   if (ok) {
-    updateCache = undefined
     void vscode.window.showInformationMessage('DeepSeek Harness updated.')
   }
 }
 
 let detectionCache: { node: ConditionState; dsh: DshDetection; at: number } | undefined
-let updateCache: { update: DshUpdate; at: number } | undefined
 
 export async function currentStatus(): Promise<ServerStatus> {
   const cfg = readConfig()
@@ -790,13 +777,6 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshState = 'ok'
   }
 
-  // Check for updates in the background (cached), so the panel can offer an update button.
-  if (!updateCache || now - updateCache.at > UPDATE_CACHE_TTL_MS) {
-    void checkDshUpdateStatus(cfg).then((u) => {
-      updateCache = { update: u, at: Date.now() }
-    })
-  }
-
   return {
     running,
     starting,
@@ -808,7 +788,6 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshPath,
     dshHome: resolveDshHome(),
     nodeVersion,
-    update: updateCache?.update,
   }
 }
 
@@ -816,7 +795,6 @@ export async function currentStatus(): Promise<ServerStatus> {
 export function clearRequirementsCaches(): void {
   addActivity('↻ Re-checking requirements…')
   detectionCache = undefined
-  updateCache = undefined
 }
 
 /** Clear the console log (in-memory feed and the persisted file). */

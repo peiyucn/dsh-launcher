@@ -152,7 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="update-row" id="updateRow" style="display:none">
       <span class="req-name">Update</span>
-      <button class="mini-btn" id="updateBtn" title="Update dsh">…</button>
+      <button class="mini-btn" id="updateBtn" title="Check for dsh updates">Update</button>
     </div>
   </div>
   <div class="card" id="dsCard">
@@ -261,15 +261,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       setMark('req-node', status.node)
       setMark('req-dsh', status.dsh)
 
-      const upd = status.update
       const updateRow = document.getElementById('updateRow')
-      const updateBtn = document.getElementById('updateBtn')
-      if (upd && upd.hasUpdate) {
-        updateRow.style.display = ''
-        updateBtn.textContent = upd.label
-      } else {
-        updateRow.style.display = 'none'
-      }
+      updateRow.style.display = status.dshSource === 'source' ? '' : 'none'
     }
 
     function renderDs(ds) {
@@ -442,7 +435,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       try {
         await this.view.webview.postMessage({
           type: 'update',
-          status: { running: false, starting: false, url: '', node: 'unknown', dsh: 'unknown', dshVersion: '', dshSource: '', dshPath: '', dshHome: '', nodeVersion: '', update: undefined },
+          status: { running: false, starting: false, url: '', node: 'unknown', dsh: 'unknown', dshVersion: '', dshSource: '', dshPath: '', dshHome: '', nodeVersion: '' },
           activity: `✗ Status refresh failed: ${msg}`,
           browser: 'built-in',
           consoleSize: 0,

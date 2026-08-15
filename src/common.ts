@@ -22,7 +22,6 @@ export const STOP_POLL_INTERVAL_MS = 200
 export const STOP_POLL_ATTEMPTS = 10
 export const STOP_POLL_PROBE_MS = 300
 export const DETECTION_CACHE_TTL_MS = 8_000
-export const UPDATE_CACHE_TTL_MS = 10 * 60 * 1000
 
 // --- Limits ---
 

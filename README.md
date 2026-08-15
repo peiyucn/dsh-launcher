@@ -21,7 +21,7 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 * **Start / Stop** — runs dsh via `npx` and opens the web UI once it is up.
 * **Source run (optional)** — run from a local checkout: set `dsh.path` to the checkout folder (must contain `apps/cli/src/bin.ts`).
 * **Dashboard panel** — server status, a live console, and the official DeepSeek API status with your account balance.
-* **DSH Update** — source-run only: shows a button when a newer version is detected, then runs `git pull`.
+* **DSH Update** — source-run only: an Update button checks the upstream and pulls when newer commits are found.
 * **Browser choice** — built-in or system browser.
 * **No console flash** on Windows (hidden console).
 
