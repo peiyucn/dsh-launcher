@@ -1,0 +1,117 @@
+{
+  "name": "dsh-launcher",
+  "displayName": "DSH Launcher",
+  "description": "Start the DeepSeek Harness web UI and open it in VS Code's built-in browser.",
+  "version": "0.1.0",
+  "icon": "resources/icon.png",
+  "publisher": "peiyucn",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peiyucn/dsh-launcher.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["AI", "Other"],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "ai",
+    "coding-agent",
+    "web-ui"
+  ],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dsh",
+          "title": "🐳 DSH Launcher",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dsh": [
+        {
+          "type": "webview",
+          "id": "dsh.panel",
+          "name": "Dashboard"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dsh.start",
+        "title": "Start",
+        "category": "DSH Launcher"
+      },
+      {
+        "command": "dsh.stop",
+        "title": "Stop service",
+        "category": "DSH Launcher"
+      },
+      {
+        "command": "dsh.update",
+        "title": "DSH Update",
+        "category": "DSH Launcher"
+      }
+    ],
+    "configuration": {
+      "title": "DSH Launcher",
+      "properties": {
+        "dsh.mode": {
+          "type": "string",
+          "enum": ["auto", "npm", "source"],
+          "default": "auto",
+          "description": "How to run DeepSeek Harness. 'auto' prefers a source checkout, then falls back to npm; 'npm' forces 'npx @deepseek-ai/dsh web'; 'source' forces a local git clone via tsx."
+        },
+        "dsh.browser": {
+          "type": "string",
+          "enum": ["built-in", "external"],
+          "default": "built-in",
+          "description": "Which browser to open the UI in. 'built-in' uses VS Code's Simple Browser (falls back to external if disabled); 'external' opens the system browser."
+        },
+        "dsh.hideConsole": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the DSH server in a hidden console so neither it nor the tool subprocesses (bash/pwsh) flash a cmd window. Turn off to show it for debugging."
+        },
+        "dsh.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to dsh (the deepseek-harness checkout for source mode). Leave empty to auto-detect; the extension fills this in when it detects or you pick the location, and you can edit it manually."
+        },
+        "dsh.nodePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to node.exe. Leave empty to use the node on PATH."
+        },
+        "dsh.port": {
+          "type": "number",
+          "default": 3080,
+          "description": "Port the web UI listens on."
+        },
+        "dsh.host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host the web UI listens on."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.5.0"
+  }
+}
