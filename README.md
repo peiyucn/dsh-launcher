@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built-in browser.
 
-> This extension does **not** ship an LLM model, DeepSeek Harness itself, or a DeepSeek API key. See [Prerequisites](#prerequisites).
+> This extension does **not** ship an LLM model, DeepSeek Harness itself, or a DeepSeek API key.
 
 ## Principles
 
@@ -23,13 +23,6 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 * **Dashboard panel** — server status, a live console, and the official DeepSeek API status with your account balance.
 * **DSH Update** — source-run only: an Update button checks the upstream and pulls when newer commits are found.
 * **Browser choice** — built-in or system browser.
-* **No console flash** on Windows (hidden console).
-
-## Prerequisites
-
-### DeepSeek API key
-
-<https://platform.deepseek.com> (the web UI needs it to run agents)
 
 ## Usage
 
