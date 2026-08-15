@@ -8,7 +8,7 @@
 
 在 VS Code 内启动 **DeepSeek Harness**（dsh），并在内置浏览器中打开它的 Web UI。
 
-> 本扩展**不**附带任何 LLM 模型、DeepSeek Harness 本身，或 DeepSeek API Key。它只负责启动你已经装好的 dsh 并打开它的 Web UI。请先阅读[前置条件](#前置条件)。
+> 本扩展**不**附带任何 LLM 模型、DeepSeek Harness 本身，或 DeepSeek API Key。请先阅读[前置条件](#前置条件)。
 
 ## 功能
 
@@ -61,12 +61,6 @@ brew install node
 | dsh.nodePath | 空 | node.exe 路径；留空则使用 PATH 上的 node |
 | dsh.port | 3080 | Web UI 端口 |
 | dsh.host | 127.0.0.1 | Web UI 监听地址 |
-
-## 命令
-
-* DSH Launcher: Start
-* DSH Launcher: Stop service
-* DSH Launcher: DSH Update
 
 ## 说明
 
