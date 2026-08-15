@@ -12,10 +12,10 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 
 ## Features
 
-* **Start / Stop** — detects dsh (npx or a git clone), starts it, and opens the web UI once it is up.
-* **Dashboard panel** — server status, a live console, the official DeepSeek API status, and your account balance.
-* **DSH Update** — `git pull` for a source checkout; the npx method needs no manual update.
-* **Browser choice** — open the UI in VS Code's built-in browser or the system browser.
+* **Start / Stop** — runs dsh via `npx` and opens the web UI once it is up.
+* **Dashboard panel** — server status, a live console, and the official DeepSeek API status with your account balance.
+* **DSH Update** — `git pull` for a source checkout.
+* **Browser choice** — built-in or system browser.
 * **No console flash** on Windows (hidden console).
 
 ## Prerequisites
@@ -38,39 +38,15 @@ winget install OpenJS.NodeJS.LTS
 brew install node
 ```
 
-### DeepSeek Harness (DSH)
+### Source-run mode (optional)
 
-Either method works.
-
-#### Run from npm
-
-Install Node.js, then run:
-
-```sh
-npx @deepseek-ai/dsh web
-```
-
-This starts the web UI, served at `http://127.0.0.1:3080` by default. See the [Web UI guide](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/index.md).
-
-#### Run from source
-
-```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
-pnpm install
-pnpm run build
-pnpm dsh web
-```
-
-When running from a checkout, set `dsh.path` to the checkout folder (or pick it with the source-mode folder picker). The extension offers a one-click `pnpm install` + `pnpm run build` if the checkout is not set up yet.
+By default the extension runs dsh via `npx @deepseek-ai/dsh web` — no dsh install needed. To run from a local checkout instead, set `dsh.path` to the checkout folder (must contain `apps/cli/src/bin.ts`), or pick it with the source-mode folder picker.
 
 ## Usage
 
-1. Install the extension and reload the window.
-2. Click the whale icon in the activity bar.
-3. Click **Start** — it starts dsh if needed, then opens the UI.
+Click the DSH Launcher icon in the activity bar, then click **Start**.
 
-Status dot: green = running / red = stopped / yellow pulsing = starting.
+<img src="resources/icon.png" width="40" alt="DSH Launcher activity bar icon">
 
 ## Settings
 
@@ -78,10 +54,10 @@ Settings → search "dsh":
 
 | Key | Default | Description |
 |---|---|---|
-| dsh.mode | auto | auto = prefer a source checkout, then npx; npm = force `npx @deepseek-ai/dsh web`; source = force a git clone via tsx |
+| dsh.mode | auto | auto/npm run `npx @deepseek-ai/dsh web`; source runs a local checkout via tsx |
 | dsh.browser | built-in | built-in or external |
 | dsh.hideConsole | true | Hide the console on Windows |
-| dsh.path | empty | Source-checkout path (must contain apps/cli/src/bin.ts) |
+| dsh.path | empty | Source-checkout path for source mode (must contain apps/cli/src/bin.ts) |
 | dsh.nodePath | empty | Path to node.exe; empty uses the node on PATH |
 | dsh.port | 3080 | Web UI port |
 | dsh.host | 127.0.0.1 | Web UI host |
@@ -96,6 +72,7 @@ Settings → search "dsh":
 
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
+* The **DeepSeek API Status** card supports DeepSeek only for now — it is hidden unless DeepSeek is configured as a model (or a DeepSeek API key is present).
 * Log file: `%APPDATA%\Code\User\globalStorage\peiyucn.dsh-launcher\dsh.log`
 
 ## License
