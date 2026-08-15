@@ -67,6 +67,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .runtime-label { flex: none; width: 30px; color: var(--vscode-descriptionForeground); font-size: 10px; opacity: .65; }
   .runtime-path, .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; font-family: var(--vscode-editor-font-family); min-width: 0; cursor: pointer; }
   .runtime-path:hover, .runtime-data:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
+  .runtime-path.missing { color: #d29922; }
   .buttons { display: flex; gap: 8px; }
   button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: background .12s, border-color .12s, color .12s; }
   button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); flex: 1; }
@@ -263,9 +264,21 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.querySelectorAll('.mode-option').forEach((b) => {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
-      runtimePathRow.style.display = status.dshPath ? '' : 'none'
-      runtimePath.textContent = status.dshPathShort || ''
-      runtimePath.title = status.dshPath || ''
+      if (mode === 'source' && !status.dshPath) {
+        // Source mode without a checkout: keep the path row visible and
+        // invite the user to configure it (clicking opens the settings).
+        runtimePathRow.style.display = ''
+        runtimePath.textContent = '⚠ not configured — click to set dsh.path'
+        runtimePath.title = 'Open extension settings'
+        runtimePath.classList.add('missing')
+        runtimePath.dataset.openSettings = '1'
+      } else {
+        runtimePathRow.style.display = status.dshPath ? '' : 'none'
+        runtimePath.textContent = status.dshPathShort || ''
+        runtimePath.title = status.dshPath || ''
+        runtimePath.classList.remove('missing')
+        delete runtimePath.dataset.openSettings
+      }
       runtimeData.textContent = status.dshHomeShort || ''
       runtimeData.title = status.dshHome || ''
     }
@@ -334,6 +347,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     })
     document.querySelectorAll('.runtime-path, .runtime-data').forEach((el) => {
       el.addEventListener('click', () => {
+        if (el.dataset.openSettings) {
+          vscode.postMessage({ command: 'openSettings' })
+          return
+        }
         const full = el.getAttribute('title')
         if (full) vscode.postMessage({ command: 'revealPath', value: full })
       })
