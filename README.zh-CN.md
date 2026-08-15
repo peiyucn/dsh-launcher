@@ -1,7 +1,7 @@
 # DSH Launcher
 
-[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher)
-[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher)
+[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-starter)
+[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--starter-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-starter)
 [![License](https://img.shields.io/github/license/peiyucn/dsh-launcher?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher/blob/master/LICENSE)
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-launcher)
@@ -65,7 +65,7 @@ brew install node
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **DeepSeek API Status** 卡片目前仅支持 DeepSeek — 只有在配置了 DeepSeek 模型（或存在 DeepSeek API Key）时才会显示。
-* 日志文件：`%APPDATA%\Code\User\globalStorage\peiyucn.dsh-launcher\dsh.log`
+* 日志文件：`%APPDATA%\Code\User\globalStorage\peiyucn.dsh-starter\dsh.log`
 
 ## License
 

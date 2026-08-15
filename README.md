@@ -1,7 +1,7 @@
 # DSH Launcher
 
-[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher)
-[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher)
+[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-starter)
+[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--starter-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-starter)
 [![License](https://img.shields.io/github/license/peiyucn/dsh-launcher?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher/blob/master/LICENSE)
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-launcher)
@@ -65,7 +65,7 @@ Settings → search "dsh":
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **DeepSeek API Status** card supports DeepSeek only for now — it is hidden unless DeepSeek is configured as a model (or a DeepSeek API key is present).
-* Log file: `%APPDATA%\Code\User\globalStorage\peiyucn.dsh-launcher\dsh.log`
+* Log file: `%APPDATA%\Code\User\globalStorage\peiyucn.dsh-starter\dsh.log`
 
 ## License
 
