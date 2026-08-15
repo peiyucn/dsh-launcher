@@ -82,17 +82,12 @@ let dshSource: '' | 'npx' | 'source' = ''
 let dshPath = ''
 let nodeVersion = ''
 
-/** The run mode chosen via the panel toggle (mirrors dsh.mode, applied immediately). */
-let selectedMode: 'npx' | 'source' | undefined
-
 export function readConfig(): DshConfig {
+  // Read the persisted settings every time: dsh.mode is the single source
+  // of truth, so both the panel toggle and the Settings UI stay in sync.
   const c = vscode.workspace.getConfiguration('dsh')
-  if (selectedMode === undefined) {
-    // Lazily adopt the persisted mode; applyMode() keeps it in sync afterward.
-    selectedMode = c.get<string>('mode') === 'source' ? 'source' : 'npx'
-  }
   return {
-    mode: selectedMode,
+    mode: c.get<string>('mode') === 'source' ? 'source' : 'npx',
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
@@ -102,9 +97,18 @@ export function readConfig(): DshConfig {
 
 /** Persist the run mode chosen in the panel toggle and apply it immediately. */
 export async function applyMode(mode: 'npx' | 'source'): Promise<void> {
-  selectedMode = mode
   detectionCache = undefined
   await vscode.workspace.getConfiguration('dsh').update('mode', mode, vscode.ConfigurationTarget.Global)
+}
+
+/** Invalidate caches when dsh settings change outside the panel (Settings UI, sync, …). */
+export function registerConfigWatcher(): vscode.Disposable {
+  return vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('dsh')) {
+      detectionCache = undefined
+      updateCache = undefined
+    }
+  })
 }
 
 export function uiUrl(cfg: DshConfig = readConfig()): string {
@@ -119,7 +123,7 @@ export function setLogPath(value: string): void {
       const lines = fs.readFileSync(consolePath, 'utf8').split(/\r?\n/).filter((l) => l.length > 0)
       for (const line of lines.slice(-LOG_RELOAD_LINES)) {
         if (line.includes('[dbg]')) continue
-        activity.push(line)
+        pushActivity(line)
       }
     }
   } catch {
@@ -127,20 +131,19 @@ export function setLogPath(value: string): void {
   }
 }
 
-export function getLogPath(): string {
-  return logPath
+/** Append one entry to the console log file (best effort). */
+function appendLog(entry: string): void {
+  if (!consolePath) return
+  try {
+    fs.appendFileSync(consolePath, entry + '\n')
+  } catch {
+    // best effort
+  }
 }
 
 /** Append a diagnostic line to the log file only (kept out of the console feed). */
 export function dbg(line: string): void {
-  const entry = `[${new Date().toLocaleTimeString()}] [dbg] ${line}`
-  if (consolePath) {
-    try {
-      fs.appendFileSync(consolePath, entry + '\n')
-    } catch {
-      // best effort
-    }
-  }
+  appendLog(`[${new Date().toLocaleTimeString()}] [dbg] ${line}`)
 }
 
 function pushActivity(entry: string): void {
@@ -152,13 +155,7 @@ function pushActivity(entry: string): void {
 function addActivity(line: string): void {
   const entry = `[${new Date().toLocaleTimeString()}] ${line}`
   pushActivity(entry)
-  if (consolePath) {
-    try {
-      fs.appendFileSync(consolePath, entry + '\n')
-    } catch {
-      // best effort
-    }
-  }
+  appendLog(entry)
 }
 
 /** Append one server-output line to the activity feed only (already in the log file). */
@@ -192,7 +189,7 @@ export function getConsoleSize(): number {
 }
 
 /** Non-destructive port probe; resolves without throwing. */
-export function isPortOpen(host: string, port: number, timeoutMs = PORT_PROBE_TIMEOUT_MS): Promise<boolean> {
+function isPortOpen(host: string, port: number, timeoutMs = PORT_PROBE_TIMEOUT_MS): Promise<boolean> {
   return new Promise((resolve) => {
     let socket: net.Socket
     try {
@@ -237,7 +234,7 @@ async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string
 }
 
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
-export function isDshCheckout(dir: string | undefined): boolean {
+function isDshCheckout(dir: string | undefined): boolean {
   if (!dir) return false
   try {
     if (fs.existsSync(path.join(dir, DSH_CLI_BIN))) return true
@@ -287,16 +284,19 @@ async function pickRepoFolder(): Promise<string | undefined> {
 }
 
 /** Detect the local dsh version: a source checkout (source mode), else the installed package. */
-async function detectDshVersion(cfg: DshConfig): Promise<void> {
+function detectDshVersion(cfg: DshConfig): void {
   if (cfg.mode === 'source') {
+    const checkout = findSourceCheckout(cfg)
+    if (!checkout) {
+      // No checkout configured: dsh is 'missing', so drop any stale version.
+      dshVersion = ''
+      return
+    }
     try {
-      const checkout = findSourceCheckout(cfg)
-      if (checkout) {
-        const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'apps', 'cli', 'package.json'), 'utf8'))
-        if (pkg?.version) {
-          dshVersion = pkg.version
-          return
-        }
+      const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'apps', 'cli', 'package.json'), 'utf8'))
+      if (pkg?.version) {
+        dshVersion = pkg.version
+        return
       }
     } catch {
       // fall through to installed package
@@ -305,17 +305,18 @@ async function detectDshVersion(cfg: DshConfig): Promise<void> {
   try {
     const link = path.join(resolveDshHome(), 'profiles', 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
     const pkg = JSON.parse(fs.readFileSync(link, 'utf8'))
-    if (pkg?.version) dshVersion = pkg.version
+    if (pkg?.version) {
+      dshVersion = pkg.version
+      return
+    }
   } catch {
     // leave empty
   }
+  // Nothing readable anywhere: clear the value instead of showing a stale one.
+  dshVersion = ''
 }
 
-export function getDshVersion(): string {
-  return dshVersion
-}
-
-export interface DshDetection {
+interface DshDetection {
   state: ConditionState
   source: '' | 'npx' | 'source'
   path: string
@@ -333,7 +334,7 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
 }
 
 /** Run a command in a visible VS Code terminal (used for updates). */
-function runInTerminal(title: string, command: string): Promise<boolean> {
+async function runInTerminal(title: string, command: string): Promise<boolean> {
   const task = new vscode.Task(
     { type: 'dsh-shell' },
     vscode.TaskScope.Global,
@@ -341,17 +342,15 @@ function runInTerminal(title: string, command: string): Promise<boolean> {
     'DeepSeek Harness',
     new vscode.ShellExecution(command),
   )
-  return Promise.resolve(vscode.tasks.executeTask(task)).then(
-    (execution) =>
-      new Promise<boolean>((resolve) => {
-        const disposable = vscode.tasks.onDidEndTaskProcess((event) => {
-          if (event.execution === execution) {
-            disposable.dispose()
-            resolve(event.exitCode === 0)
-          }
-        })
-      }),
-  )
+  const execution = await vscode.tasks.executeTask(task)
+  return new Promise<boolean>((resolve) => {
+    const disposable = vscode.tasks.onDidEndTaskProcess((event) => {
+      if (event.execution === execution) {
+        disposable.dispose()
+        resolve(event.exitCode === 0)
+      }
+    })
+  })
 }
 
 /**
@@ -600,7 +599,7 @@ async function ensureCheckoutReady(checkout: string): Promise<boolean> {
 
 /** Make sure the server is running (no re-entrancy guard). */
 async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
-  void detectDshVersion(cfg)
+  detectDshVersion(cfg)
   if (await isPortOpen(cfg.host, cfg.port)) {
     nodeState = 'ok'
     dshState = 'ok'
@@ -627,6 +626,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
       repoPath = await pickRepoFolder()
       if (!repoPath) {
         dshState = 'missing'
+        addActivity('✗ No source checkout found — set dsh.path or pick the repo folder')
         void vscode.window.showErrorMessage(
           'DeepSeek Harness: no source checkout found. Pick the repo folder containing apps/cli/src/bin.ts, or set dsh.path.',
         )
@@ -804,7 +804,7 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshSource = dshDet.source
     dshPath = dshDet.path
     detectionCache = { node: nodeState, dsh: dshDet, at: now }
-    void detectDshVersion(cfg)
+    detectDshVersion(cfg)
   }
 
   if (running) {

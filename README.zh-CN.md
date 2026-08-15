@@ -14,7 +14,6 @@
 
 * **松耦合** — 扩展只通过它的公开入口（`npx` 或源码检出）启动它并打开 Web UI，不依赖 dsh 的内部实现——所以你配的 dsh 插件照常生效。
 * **适应快速变化** — 用官方命令启动、只读稳定的 `~/.dsh` 数据，升级后也能继续工作。
-* **原生 Windows** — 纯 Windows + Node.js/npm 即可运行，不需要 WSL 或额外 Linux 环境。
 
 ## 功能
 
@@ -47,12 +46,13 @@
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在dsh里配置了 DeepSeek 模型时才会显示。
 * 日志文件：`%TEMP%\dsh-launcher-vscode.log`
+* DSH在Windows下暂无法正常运行“极简模式”。
 
 ## 环境
 
 * **Node.js** — 22.19+（或 >= 24）
 * **VS Code** — 1.85+
-* **bash**（如 Git Bash）— 可选；仅 dsh 极简模式需要（该模式用 bash 而非 PowerShell）
+* **PowerShell 7** — 可选；Windows 下推荐安装
 
 ## License
 

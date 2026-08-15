@@ -6,7 +6,6 @@ import { resolveDshHome, toEnglish } from './common'
 export interface DsComponentStatus {
   id: string
   name: string
-  section: string
   status: 'operational' | 'degraded' | 'partial_outage' | 'full_outage' | 'maintenance'
 }
 
@@ -14,7 +13,6 @@ export interface DsIncident {
   id: string
   title: string
   status: string
-  startAt: number
 }
 
 export interface DsStatus {
@@ -121,7 +119,6 @@ function parseDsStatus(json: any): DsStatus {
         id: String(ch?.change_id ?? ''),
         title: toEnglish(String(ch?.title ?? '')),
         status: String(ch?.status ?? '').trim(),
-        startAt: Number(ch?.start_at_seconds ?? 0) || 0,
       })
       for (const ac of ch?.affected_components ?? []) {
         const id = String(ac?.component_id ?? '')
@@ -133,7 +130,6 @@ function parseDsStatus(json: any): DsStatus {
     const components: DsComponentStatus[] = raw.map((c) => ({
       id: c.id,
       name: c.name,
-      section: '',
       status: (statusById.get(c.id) ?? 'operational') as DsComponentStatus['status'],
     }))
 
@@ -160,10 +156,6 @@ function parseDsStatus(json: any): DsStatus {
   }
 }
 
-/** Force the next getDsStatus() to refetch the status. */
-export function clearDsStatusCache(): void {
-  dsStatusCache = undefined
-}
 
 /** Read a credential from the environment (wins) or `$DSH_HOME/.credentials.yaml`. */
 function readCredential(name: string): string | undefined {

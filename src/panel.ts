@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, runDshUpdate } from './server'
+import { applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -211,7 +211,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     }, 6000)
 
     function esc(s) {
-      return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
     }
     function compStateClass(st) {
       return st === 'operational' ? 'ok' : st === 'degraded' ? 'degraded' : st === 'maintenance' ? 'maintenance' : (st === 'partial_outage' || st === 'full_outage') ? 'down' : ''
@@ -327,9 +327,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     })
     document.querySelectorAll('.mode-option').forEach((b) => {
       b.addEventListener('click', () => {
-        // Optimistic highlight so the toggle responds instantly.
-        document.querySelectorAll('.mode-option').forEach((x) => x.classList.remove('active'))
-        b.classList.add('active')
+        // No optimistic highlight: the pill only moves once the mode is
+        // actually applied (confirmed), via the next status update.
         vscode.postMessage({ command: 'setMode', value: b.dataset.mode })
       })
     })
@@ -422,17 +421,19 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       case 'setMode':
         if (message.value === 'npx' || message.value === 'source') {
           const wasRunning = await isServerRunning()
-          await applyMode(message.value)
           if (wasRunning) {
+            // Confirm before switching so that cancelling keeps the current mode.
             const pick = await vscode.window.showInformationMessage(
               `DeepSeek Harness is running — restart with ${message.value} mode?`,
               'Restart',
               'Cancel',
             )
-            if (pick === 'Restart') {
-              await actionStop()
-              await actionStart()
-            }
+            if (pick !== 'Restart') break
+            await applyMode(message.value)
+            await actionStop()
+            await actionStart()
+          } else {
+            await applyMode(message.value)
           }
         }
         break
@@ -489,10 +490,28 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       console.error('[dsh-launcher-vscode] refresh failed:', error)
+      // Typed fallback so it stays in sync with ServerStatus (no drifting fields).
+      const cfg = readConfig()
+      const fallback: ServerStatus = {
+        running: false,
+        starting: false,
+        url: '',
+        node: 'unknown',
+        dsh: 'unknown',
+        dshVersion: '',
+        dshSource: '',
+        dshPath: '',
+        dshHome: '',
+        dshPathShort: '',
+        dshHomeShort: '',
+        nodeVersion: '',
+        mode: cfg.mode,
+        update: undefined,
+      }
       try {
         await this.view.webview.postMessage({
           type: 'update',
-          status: { running: false, starting: false, url: '', node: 'unknown', dsh: 'unknown', dshVersion: '', dshSource: '', dshPath: '', dshHome: '', dshPathShort: '', dshHomeShort: '', nodeVersion: '' },
+          status: fallback,
           activity: `✗ Status refresh failed: ${msg}`,
           browser: 'built-in',
           consoleSize: 0,

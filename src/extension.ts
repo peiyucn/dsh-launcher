@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import * as vscode from 'vscode'
 import { actionStart } from './actions'
 import { DshPanelProvider } from './panel'
-import { currentStatus, dbg, setLogPath } from './server'
+import { currentStatus, dbg, registerConfigWatcher, setLogPath } from './server'
 
 export function activate(context: vscode.ExtensionContext): void {
   setLogPath(path.join(os.tmpdir(), 'dsh-launcher-vscode.log'))
@@ -15,6 +15,8 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
   )
+
+  context.subscriptions.push(registerConfigWatcher())
 
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100)
   statusBar.command = 'dsh.start'

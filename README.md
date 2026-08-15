@@ -12,21 +12,20 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 
 ## Principles
 
-* **Loose coupling** — dsh is treated as a black box: the extension starts it through its public entry point (`npx` or a source checkout) and opens the web UI, never depending on dsh internals — so dsh plugins work as-is.
-* **Resilient to fast change** — dsh moves quickly; by launching it with official commands and reading only stable `~/.dsh` data, the extension keeps working across upgrades.
-* **Native Windows** — runs on plain Windows with Node.js + npm; no WSL or extra Linux tooling required.
+* **Loose coupling** — the extension only starts dsh through its public entry point (`npx` or a source checkout) and opens the web UI, never depending on dsh internals — so the dsh plugins you configure keep working as-is.
+* **Resilient to fast change** — it launches with the official command and reads only stable `~/.dsh` data, so it keeps working across upgrades.
 
 ## Features
 
-* **Start / Stop** — runs dsh via `npx` and opens the web UI once it is up.
+* **Start / Stop** — runs dsh via `npx` and opens the web UI once it is ready.
 * **Source run (optional)** — run from a local checkout: set `dsh.path` to the checkout folder (must contain `apps/cli/src/bin.ts`).
-* **Dashboard panel** — server status, a live console, and the official DeepSeek API status with your account balance.
-* **DSH Update** — source-run only: an Update button checks the upstream and pulls when newer commits are found.
+* **Dashboard panel** — server status, a live console, the official DeepSeek API status, and your account balance.
+* **DSH Update** — source run only: click the Update button to check upstream, and pull when new commits are found.
 * **Browser choice** — built-in or system browser.
 
 ## Usage
 
-Click the DSH Launcher icon in the activity bar, then click **Start**.
+Click the DSH Launcher whale icon in the activity bar, then click **Start**.
 
 ## Settings
 
@@ -45,14 +44,15 @@ Settings → search "dsh":
 
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
-* The **API Status** card supports DeepSeek only for now — it is hidden unless a DeepSeek model is configured in dsh.
+* The **API Status** card supports DeepSeek only for now — it only shows when a DeepSeek model is configured in dsh.
 * Log file: `%TEMP%\dsh-launcher-vscode.log`
+* DSH cannot run "minimal mode" properly on Windows for now.
 
 ## Environment
 
 * **Node.js** — 22.19+ (or >= 24)
 * **VS Code** — 1.85+
-* **bash** (e.g. Git Bash) — optional; only needed for dsh's minimal mode (which uses bash instead of PowerShell)
+* **PowerShell 7** — optional; recommended on Windows
 
 ## License
 
