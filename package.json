@@ -1,5 +1,5 @@
 {
-  "name": "dsh-starter",
+  "name": "dsh-launcher-vscode",
   "displayName": "DSH Launcher",
   "description": "Start the DeepSeek Harness web UI and open it in VS Code's built-in browser.",
   "version": "0.1.0",

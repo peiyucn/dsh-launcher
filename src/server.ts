@@ -713,8 +713,9 @@ export function stopServer(): Promise<boolean> {
   return exclusive(stopServerUnlocked)
 }
 
-/** Check for a newer dsh version (source checkout: git commits ahead of upstream). */
+/** Check for a newer dsh version (source mode only: git commits ahead of upstream). */
 async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
+  if (cfg.mode !== 'source') return { hasUpdate: false, label: '' }
   const checkout = findSourceCheckout(cfg)
   if (!checkout) return { hasUpdate: false, label: '' }
   await runFile('git', ['-C', checkout, 'fetch'])
@@ -736,13 +737,18 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
   return { hasUpdate: true, label }
 }
 
-/** Update dsh (git pull for a source checkout). */
+/** Update dsh (source mode only: git pull for the configured checkout). */
 export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
-  const checkout = findSourceCheckout(cfg)
-  if (!checkout) {
+  if (cfg.mode !== 'source') {
     addActivity('↑ No update needed (npm mode resolves latest)')
     void vscode.window.showInformationMessage('npx resolves @deepseek-ai/dsh from the registry on every run, so no manual update is needed.')
+    return
+  }
+  const checkout = findSourceCheckout(cfg)
+  if (!checkout) {
+    addActivity('↑ No source checkout configured (set dsh.path)')
+    void vscode.window.showWarningMessage('Set dsh.path to the source checkout to update it.')
     return
   }
   addActivity('↑ Updating dsh (git pull)…')
