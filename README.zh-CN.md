@@ -10,6 +10,12 @@
 
 > 本扩展**不**附带任何 LLM 模型、DeepSeek Harness 本身，或 DeepSeek API Key。请先阅读[前置条件](#前置条件)。
 
+## 设计原则
+
+* **松耦合** — 把 dsh 当作黑盒：扩展只通过它的公开入口（`npx` 或源码检出）启动它并打开 Web UI，不依赖 dsh 的内部实现。
+* **适应快速变化** — dsh 迭代很快；用官方命令启动、只读稳定的 `~/.dsh` 数据，升级后也能继续工作。
+* **原生 Windows，无需 WSL** — 纯 Windows + Node.js/npm 即可运行，不需要 WSL 或额外 Linux 环境。
+
 ## 功能
 
 * **启动 / 停止** — 通过 `npx` 运行 dsh，并在就绪后打开 Web UI。

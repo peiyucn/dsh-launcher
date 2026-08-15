@@ -10,6 +10,12 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 
 > This extension does **not** ship an LLM model, DeepSeek Harness itself, or a DeepSeek API key. See [Prerequisites](#prerequisites).
 
+## Principles
+
+* **Loose coupling** — dsh is treated as a black box: the extension starts it through its public entry point (`npx` or a source checkout) and opens the web UI, never depending on dsh internals.
+* **Resilient to fast change** — dsh moves quickly; by launching it with official commands and reading only stable `~/.dsh` data, the extension keeps working across upgrades.
+* **Native Windows, no WSL** — runs on plain Windows with Node.js + npm; no WSL or extra Linux tooling required.
+
 ## Features
 
 * **Start / Stop** — runs dsh via `npx` and opens the web UI once it is up.
