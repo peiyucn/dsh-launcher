@@ -128,7 +128,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-sub" id="statusSub"></span>
       </div>
       <div class="mode-toggle" id="modeToggle">
-        <button class="mode-option" data-mode="npm">npm</button>
+        <button class="mode-option" data-mode="npx">npx</button>
         <button class="mode-option" data-mode="source">source</button>
       </div>
     </div>
@@ -259,7 +259,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         statusSub.textContent = running ? (status.url || '') : ''
         startBtn.textContent = running ? '↗ New Tab' : '▶ Start'
       }
-      const mode = status.mode === 'source' ? 'source' : 'npm'
+      const mode = status.mode === 'source' ? 'source' : 'npx'
       document.querySelectorAll('.mode-option').forEach((b) => {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
@@ -420,7 +420,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await clearRequirementsCaches()
         break
       case 'setMode':
-        if (message.value === 'npm' || message.value === 'source') {
+        if (message.value === 'npx' || message.value === 'source') {
           const wasRunning = await isServerRunning()
           await applyMode(message.value)
           if (wasRunning) {

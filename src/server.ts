@@ -30,7 +30,7 @@ import {
 // module stays focused on server lifecycle).
 export { fetchDshBalance, getDshBalance, getDsStatus, hasDeepSeekModel } from './ds'
 
-export type DshMode = 'auto' | 'npm' | 'source'
+export type DshMode = 'npx' | 'source'
 
 /** Resolved extension settings (dsh.*). */
 export interface DshConfig {
@@ -56,7 +56,7 @@ export interface ServerStatus {
   dshPathShort: string
   dshHomeShort: string
   nodeVersion: string
-  mode: 'npm' | 'source'
+  mode: 'npx' | 'source'
   update: DshUpdate | undefined
 }
 
@@ -78,18 +78,18 @@ let logTailWatcher: fs.FSWatcher | undefined
 let logTailOffset = 0
 let logTailBuffer = ''
 let dshVersion = ''
-let dshSource: '' | 'npm' | 'source' = ''
+let dshSource: '' | 'npx' | 'source' = ''
 let dshPath = ''
 let nodeVersion = ''
 
 /** The run mode chosen via the panel toggle (mirrors dsh.mode, applied immediately). */
-let selectedMode: 'npm' | 'source' | undefined
+let selectedMode: 'npx' | 'source' | undefined
 
 export function readConfig(): DshConfig {
   const c = vscode.workspace.getConfiguration('dsh')
   if (selectedMode === undefined) {
     // Lazily adopt the persisted mode; applyMode() keeps it in sync afterward.
-    selectedMode = c.get<string>('mode') === 'source' ? 'source' : 'npm'
+    selectedMode = c.get<string>('mode') === 'source' ? 'source' : 'npx'
   }
   return {
     mode: selectedMode,
@@ -101,7 +101,7 @@ export function readConfig(): DshConfig {
 }
 
 /** Persist the run mode chosen in the panel toggle and apply it immediately. */
-export async function applyMode(mode: 'npm' | 'source'): Promise<void> {
+export async function applyMode(mode: 'npx' | 'source'): Promise<void> {
   selectedMode = mode
   await vscode.workspace.getConfiguration('dsh').update('mode', mode, vscode.ConfigurationTarget.Global)
 }
@@ -316,18 +316,18 @@ export function getDshVersion(): string {
 
 export interface DshDetection {
   state: ConditionState
-  source: '' | 'npm' | 'source'
+  source: '' | 'npx' | 'source'
   path: string
 }
 
-/** Detect dsh: source mode uses a checkout; npm/auto use the official npm method. */
+/** Detect dsh: source mode uses a checkout; npx uses the official npx method. */
 async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
     return { state: 'missing', source: '', path: '' }
   }
-  if (await findOnPath('npx')) return { state: 'ok', source: 'npm', path: '' }
+  if (await findOnPath('npx')) return { state: 'ok', source: 'npx', path: '' }
   return { state: 'missing', source: '', path: '' }
 }
 
@@ -523,10 +523,10 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath)
 }
 
-/** npm mode: run the official `npx @deepseek-ai/dsh web` command. */
+/** npx mode: run the official `npx @deepseek-ai/dsh web` command. */
 function spawnNpm(cfg: DshConfig): void {
   dshState = 'ok'
-  addActivity('✓ dsh detected (npm run)')
+  addActivity('✓ dsh detected (npx run)')
   addActivity(`▶ Start: ${NPX_RUN_COMMAND} --port ${cfg.port}`)
   // Windows: npx is a .cmd shim, so run it through the shell.
   spawnServer('npx', ['-y', '@deepseek-ai/dsh', 'web', '--port', String(cfg.port)], undefined, process.platform === 'win32')
@@ -640,7 +640,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     return waitForPort(cfg, START_TIMEOUT_MS)
   }
 
-  // npm and auto both use the official npx method (source needs explicit opt-in)
+  // npx (and legacy auto) both use the official npx method (source needs explicit opt-in)
   spawnNpm(cfg)
   return waitForPort(cfg, START_TIMEOUT_MS)
 }
@@ -762,7 +762,7 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
 export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
   if (cfg.mode !== 'source') {
-    addActivity('↑ No update needed (npm mode resolves latest)')
+    addActivity('↑ No update needed (npx mode resolves latest)')
     void vscode.window.showInformationMessage('npx resolves @deepseek-ai/dsh from the registry on every run, so no manual update is needed.')
     return
   }
@@ -825,7 +825,7 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshPathShort: maskPath(dshPath),
     dshHomeShort: maskPath(dshHome),
     nodeVersion,
-    mode: cfg.mode === 'source' ? 'source' : 'npm',
+    mode: cfg.mode === 'source' ? 'source' : 'npx',
     update: updateCache?.update,
   }
 }

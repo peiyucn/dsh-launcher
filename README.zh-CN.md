@@ -34,7 +34,6 @@
 
 | 键               | 默认值       | 说明                                                          |
 | --------------- | --------- | ----------------------------------------------------------- |
-| dsh.mode        | auto      | auto/npm 运行 `npx @deepseek-ai/dsh web`；source 通过 tsx 运行本地检出 |
 | dsh.browser     | built-in  | built-in 或 external                                         |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
 | dsh.path        | 空         | source 模式的源码检出路径（必须包含 apps/cli/src/bin.ts）                  |

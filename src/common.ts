@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process'
 
 // --- dsh ---
 
-/** Official npm method: npx resolves from the registry on every run. */
+/** Official npx method: npx resolves from the registry on every run. */
 export const NPX_RUN_COMMAND = 'npx @deepseek-ai/dsh web'
 
 /** Marker path that identifies a deepseek-harness source checkout. */

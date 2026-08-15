@@ -34,7 +34,6 @@ Settings → search "dsh":
 
 | Key | Default | Description |
 |---|---|---|
-| dsh.mode | auto | auto/npm run `npx @deepseek-ai/dsh web`; source runs a local checkout via tsx |
 | dsh.browser | built-in | built-in or external |
 | dsh.hideConsole | true | Hide the console on Windows |
 | dsh.path | empty | Source-checkout path for source mode (must contain apps/cli/src/bin.ts) |
