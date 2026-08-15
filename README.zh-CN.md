@@ -1,7 +1,7 @@
 # DSH Launcher
 
-[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-starter)
-[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--starter-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-starter)
+[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-vscode)
+[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher--vscode-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-vscode)
 [![License](https://img.shields.io/github/license/peiyucn/dsh-launcher?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher/blob/master/LICENSE)
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-launcher)
@@ -12,41 +12,24 @@
 
 ## 设计原则
 
-* **松耦合** — 把 dsh 当作黑盒：扩展只通过它的公开入口（`npx` 或源码检出）启动它并打开 Web UI，不依赖 dsh 的内部实现。
-* **适应快速变化** — dsh 迭代很快；用官方命令启动、只读稳定的 `~/.dsh` 数据，升级后也能继续工作。
-* **原生 Windows，无需 WSL** — 纯 Windows + Node.js/npm 即可运行，不需要 WSL 或额外 Linux 环境。
+* **松耦合** — 扩展只通过它的公开入口（`npx` 或源码检出）启动它并打开 Web UI，不依赖 dsh 的内部实现。
+* **适应快速变化** — 用官方命令启动、只读稳定的 `~/.dsh` 数据，升级后也能继续工作。
+* **原生 Windows** — 纯 Windows + Node.js/npm 即可运行，不需要 WSL 或额外 Linux 环境。
 
 ## 功能
 
 * **启动 / 停止** — 通过 `npx` 运行 dsh，并在就绪后打开 Web UI。
+* **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为检出目录（需包含 `apps/cli/src/bin.ts`）。
 * **仪表盘面板** — 服务状态、实时控制台、DeepSeek 官方 API 状态以及你的账户余额。
-* **DSH 更新** — 源码检出时执行 `git pull`。
+* **DSH 更新** — 仅源码运行时出现：检测到新版本时显示按钮，点击执行 `git pull`。
 * **浏览器选择** — 内置浏览器或系统浏览器。
 * **Windows 下无控制台闪烁**（隐藏控制台）。
 
 ## 前置条件
 
-这些由你自行准备 — 扩展不会替你安装。
-
 ### DeepSeek API Key
 
 <https://platform.deepseek.com>（运行 agent 时 Web UI 需要它）
-
-### Node.js
-
-22.19+（或 >= 24）：<https://nodejs.org>
-
-```sh
-# Windows
-winget install OpenJS.NodeJS.LTS
-
-# macOS
-brew install node
-```
-
-### 源码运行模式（可选）
-
-默认情况下扩展通过 `npx @deepseek-ai/dsh web` 运行 dsh — 无需单独安装 dsh。如果想改为从本地仓库检出运行，请把 `dsh.path` 设为检出目录（需包含 `apps/cli/src/bin.ts`），或通过 source 模式的文件夹选择器选择。
 
 ## 使用方法
 
@@ -70,8 +53,13 @@ brew install node
 
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
-* **DeepSeek API Status** 卡片目前仅支持 DeepSeek — 只有在配置了 DeepSeek 模型（或存在 DeepSeek API Key）时才会显示。
-* 日志文件：`%APPDATA%\Code\User\globalStorage\peiyucn.dsh-starter\dsh.log`
+* **API Status** 卡片目前仅支持 DeepSeek — 只有在dsh里配置了 DeepSeek 模型时才会显示。
+* 日志文件：`%APPDATA%\Code\User\globalStorage\peiyucn.dsh-launcher-vscode\dsh.log`
+
+## 环境
+
+* **Node.js** — 22.19+（或 >= 24）
+* **VS Code** — 1.85+
 
 ## License
 
