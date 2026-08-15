@@ -53,7 +53,7 @@ Settings → search "dsh":
 
 * **Node.js** — 22.19+ (or >= 24)
 * **VS Code** — 1.85+
-* **bash** — optional; only needed for dsh's minimal mode (which uses bash instead of PowerShell)
+* **bash** (e.g. Git Bash) — optional; only needed for dsh's minimal mode (which uses bash instead of PowerShell)
 
 ## License
 
