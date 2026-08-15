@@ -717,12 +717,21 @@ async function stopServerUnlocked(): Promise<boolean> {
   }
   starting = false
   stopLogTail()
-  addActivity(pids.length > 0 ? '■ Server stopped' : '■ Server not running')
+  if (pids.length === 0) {
+    addActivity('■ Server not running')
+    return false
+  }
+  addActivity('■ Stopping server…')
   for (let i = 0; i < STOP_POLL_ATTEMPTS; i++) {
     await sleep(STOP_POLL_INTERVAL_MS)
-    if (!(await isPortOpen(cfg.host, cfg.port, STOP_POLL_PROBE_MS))) return true
+    if (!(await isPortOpen(cfg.host, cfg.port, STOP_POLL_PROBE_MS))) {
+      addActivity('■ Server stopped')
+      return true
+    }
   }
-  return !(await isPortOpen(cfg.host, cfg.port, STOP_POLL_PROBE_MS))
+  const stillOpen = await isPortOpen(cfg.host, cfg.port, STOP_POLL_PROBE_MS)
+  addActivity(stillOpen ? '⚠ Could not stop the server — the port is still in use' : '■ Server stopped')
+  return !stillOpen
 }
 
 export function stopServer(): Promise<boolean> {

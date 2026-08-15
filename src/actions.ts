@@ -38,13 +38,9 @@ export async function actionStart(): Promise<void> {
   }
 }
 
+/** Stop the server. The outcome is reported in the panel console, not a toast. */
 export async function actionStop(): Promise<void> {
-  const stopped = await stopServer()
-  if (stopped) {
-    void vscode.window.showInformationMessage('DeepSeek Harness stopped.')
-  } else {
-    void vscode.window.showWarningMessage('DeepSeek Harness was not running, or could not be stopped.')
-  }
+  await stopServer()
 }
 
 export async function actionSetBrowser(value: string): Promise<void> {
