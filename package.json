@@ -48,16 +48,6 @@
         "command": "dsh.start",
         "title": "Start",
         "category": "DSH Launcher"
-      },
-      {
-        "command": "dsh.stop",
-        "title": "Stop service",
-        "category": "DSH Launcher"
-      },
-      {
-        "command": "dsh.update",
-        "title": "DSH Update",
-        "category": "DSH Launcher"
       }
     ],
     "configuration": {

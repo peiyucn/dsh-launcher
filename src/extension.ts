@@ -1,6 +1,6 @@
 import * as path from 'node:path'
 import * as vscode from 'vscode'
-import { actionCheckUpdate, actionStart, actionStop } from './actions'
+import { actionStart } from './actions'
 import { DshPanelProvider } from './panel'
 import { currentStatus, dbg, setLogPath } from './server'
 
@@ -60,8 +60,6 @@ export function activate(context: vscode.ExtensionContext): void {
     statusBar,
     { dispose: () => { clearInterval(statusTimer); stopSpinner() } },
     vscode.commands.registerCommand('dsh.start', () => actionStart()),
-    vscode.commands.registerCommand('dsh.stop', () => actionStop()),
-    vscode.commands.registerCommand('dsh.update', () => actionCheckUpdate()),
   )
 }
 

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs'
 import * as vscode from 'vscode'
-import { checkDshUpdate, ensureRunning, getLogPath, readConfig, stopServer, uiUrl } from './server'
+import { ensureRunning, getLogPath, readConfig, stopServer, uiUrl } from './server'
 
 /** Open the UI per dsh.browser: built-in (with fallback) or external. */
 async function openBrowser(): Promise<void> {
@@ -50,10 +50,6 @@ export async function actionStop(): Promise<void> {
   } else {
     void vscode.window.showWarningMessage('DeepSeek Harness was not running, or could not be stopped.')
   }
-}
-
-export async function actionCheckUpdate(): Promise<void> {
-  await checkDshUpdate()
 }
 
 export async function actionLogs(): Promise<void> {

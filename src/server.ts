@@ -338,39 +338,6 @@ function runInTerminal(title: string, command: string): Promise<boolean> {
   )
 }
 
-/** Check for dsh updates: git pull for a source checkout; npx needs none. */
-export async function checkDshUpdate(): Promise<void> {
-  const cfg = readConfig()
-  const checkout = findSourceCheckout(cfg)
-  if (checkout) {
-    await checkSourceUpdate(checkout)
-  } else {
-    void vscode.window.showInformationMessage(
-      'npx resolves @deepseek-ai/dsh from the registry on every run, so no manual update is needed.',
-    )
-  }
-}
-
-async function checkSourceUpdate(checkout: string): Promise<void> {
-  await runFile('git', ['-C', checkout, 'fetch'])
-  const r = await runFile('git', ['-C', checkout, 'rev-list', '--count', 'HEAD..@{upstream}'])
-  if (!r.ok) {
-    void vscode.window.showWarningMessage('Cannot check for dsh updates (git has no upstream).')
-    return
-  }
-  const count = Number(r.stdout.trim())
-  if (Number.isFinite(count) && count > 0) {
-    const pick = await vscode.window.showInformationMessage(
-      `Found ${count} new commits. Pull now?`,
-      'Update',
-      'Cancel',
-    )
-    if (pick === 'Update') await runInTerminal('Update DeepSeek Harness', `git -C "${checkout}" pull`)
-  } else {
-    void vscode.window.showInformationMessage(`dsh is up to date (${dshVersion || 'source checkout'}).`)
-  }
-}
-
 /**
  * Stream the DSH log file (written via cmd redirection by the hidden-console
  * launcher) into the dashboard activity feed as it grows.
