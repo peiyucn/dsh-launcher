@@ -244,7 +244,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
       const startBtn = document.getElementById('startBtn')
-      const runtimePathRow = document.getElementById('runtimePathRow')
       const runtimePath = document.getElementById('runtimePath')
       const runtimeData = document.getElementById('runtimeData')
       if (starting) {
@@ -264,22 +263,23 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.querySelectorAll('.mode-option').forEach((b) => {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
+      // Both runtime rows are always rendered (path above data) so the
+      // layout never jumps when switching modes; use '—' as the empty
+      // placeholder.
       if (mode === 'source' && !status.dshPath) {
-        // Source mode without a checkout: keep the path row visible and
-        // invite the user to configure it (clicking opens the settings).
-        runtimePathRow.style.display = ''
+        // Source mode without a checkout: invite the user to configure it
+        // (clicking opens the extension settings).
         runtimePath.textContent = '⚠ not configured — click to set dsh.path'
         runtimePath.title = 'Open extension settings'
         runtimePath.classList.add('missing')
         runtimePath.dataset.openSettings = '1'
       } else {
-        runtimePathRow.style.display = status.dshPath ? '' : 'none'
-        runtimePath.textContent = status.dshPathShort || ''
+        runtimePath.textContent = status.dshPathShort || '—'
         runtimePath.title = status.dshPath || ''
         runtimePath.classList.remove('missing')
         delete runtimePath.dataset.openSettings
       }
-      runtimeData.textContent = status.dshHomeShort || ''
+      runtimeData.textContent = status.dshHomeShort || '—'
       runtimeData.title = status.dshHome || ''
     }
 
