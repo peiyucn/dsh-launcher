@@ -82,16 +82,28 @@ let dshSource: '' | 'npm' | 'source' = ''
 let dshPath = ''
 let nodeVersion = ''
 
+/** The run mode chosen via the panel toggle (mirrors dsh.mode, applied immediately). */
+let selectedMode: 'npm' | 'source' | undefined
+
 export function readConfig(): DshConfig {
   const c = vscode.workspace.getConfiguration('dsh')
-  const mode = c.get<string>('mode')
+  if (selectedMode === undefined) {
+    // Lazily adopt the persisted mode; applyMode() keeps it in sync afterward.
+    selectedMode = c.get<string>('mode') === 'source' ? 'source' : 'npm'
+  }
   return {
-    mode: mode === 'npm' || mode === 'source' ? mode : 'auto',
+    mode: selectedMode,
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
     host: c.get<string>('host') ?? '127.0.0.1',
   }
+}
+
+/** Persist the run mode chosen in the panel toggle and apply it immediately. */
+export async function applyMode(mode: 'npm' | 'source'): Promise<void> {
+  selectedMode = mode
+  await vscode.workspace.getConfiguration('dsh').update('mode', mode, vscode.ConfigurationTarget.Global)
 }
 
 export function uiUrl(cfg: DshConfig = readConfig()): string {

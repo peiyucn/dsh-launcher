@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, runDshUpdate } from './server'
+import { applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, runDshUpdate } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -326,7 +326,12 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       vscode.postMessage({ command: 'setBrowser', value: e.target.value })
     })
     document.querySelectorAll('.mode-option').forEach((b) => {
-      b.addEventListener('click', () => vscode.postMessage({ command: 'setMode', value: b.dataset.mode }))
+      b.addEventListener('click', () => {
+        // Optimistic highlight so the toggle responds instantly.
+        document.querySelectorAll('.mode-option').forEach((x) => x.classList.remove('active'))
+        b.classList.add('active')
+        vscode.postMessage({ command: 'setMode', value: b.dataset.mode })
+      })
     })
     document.querySelectorAll('.runtime-path, .runtime-data').forEach((el) => {
       el.addEventListener('click', () => {
@@ -416,7 +421,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         break
       case 'setMode':
         if (message.value === 'npm' || message.value === 'source') {
-          await vscode.workspace.getConfiguration('dsh').update('mode', message.value, vscode.ConfigurationTarget.Global)
+          await applyMode(message.value)
         }
         break
       case 'revealPath':
