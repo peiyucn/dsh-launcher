@@ -773,22 +773,17 @@ export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
   if (cfg.mode !== 'source') {
     addActivity('↑ No update needed (npx mode resolves latest)')
-    void vscode.window.showInformationMessage('npx resolves @deepseek-ai/dsh from the registry on every run, so no manual update is needed.')
     return
   }
   const checkout = findSourceCheckout(cfg)
   if (!checkout) {
     addActivity('↑ No source checkout configured (set dsh.path)')
-    void vscode.window.showWarningMessage('Set dsh.path to the source checkout to update it.')
     return
   }
   addActivity('↑ Updating dsh (git pull)…')
   const ok = await runInTerminal('Update DeepSeek Harness', `git -C "${checkout}" pull`)
   addActivity(ok ? '↑ dsh updated' : '↑ dsh update failed')
-  if (ok) {
-    updateCache = undefined
-    void vscode.window.showInformationMessage('DeepSeek Harness updated.')
-  }
+  if (ok) updateCache = undefined
 }
 
 let detectionCache: { node: ConditionState; dsh: DshDetection; at: number } | undefined
