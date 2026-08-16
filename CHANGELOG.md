@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-08-16
 
 - Initial release: start DeepSeek Harness (dsh) from VS Code and open its web UI.
 - Dashboard panel with live server status, console log, DeepSeek API status, and account balance.
