@@ -2,7 +2,7 @@
   "name": "dsh-launcher-panel",
   "displayName": "DSH Launcher Panel",
   "description": "Start the DeepSeek Harness web UI and open it in VS Code's built-in browser.",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "icon": "resources/icon.png",
   "publisher": "peiyucn",
   "license": "MIT",
