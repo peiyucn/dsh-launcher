@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-08-16
+
+- The "Starting…" status now reads "Starting DeepSeek Harness Web UI…".
+- Removed pop-up notifications for the DSH Update action; results now appear only in the panel console.
+- Improved the extension description and search keywords.
+
 ## [0.1.0] - 2026-08-16
 
 - Initial release: start DeepSeek Harness (dsh) from VS Code and open its web UI.
