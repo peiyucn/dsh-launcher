@@ -1,4 +1,4 @@
-# 项目指令 — dsh-launcher
+# 项目指令 — dsh-launcher-panel
 
 ## 语言
 
@@ -8,7 +8,7 @@
 
 ## 项目概况
 
-VS Code 扩展「DSH Launcher」：启动 DeepSeek Harness（dsh），并在 VS Code 内置浏览器中打开它的 Web UI。
+VS Code 扩展「DSH Launcher Panel」：启动 DeepSeek Harness（dsh），并在 VS Code 内置浏览器中打开它的 Web UI。
 
 * TypeScript 实现，源码在 `src/`；编译产物 `out/` 与打包产物 `*.vsix` 均不入库（见 `.gitignore`）
 * 本地验证打包 = `npm run compile` + `npm run package` 全部成功（package 由 `@vscode/vsce` 完成）

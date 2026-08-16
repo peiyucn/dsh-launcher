@@ -1,10 +1,10 @@
-# DSH Launcher
+# DSH Launcher Panel
 
-[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-vscode)
-[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher--vscode-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-vscode)
-[![License](https://img.shields.io/github/license/peiyucn/dsh-launcher?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher/blob/master/LICENSE)
+[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher-panel?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-panel)
+[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher--panel-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-panel)
+[![License](https://img.shields.io/github/license/peiyucn/dsh-launcher-panel?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher-panel/blob/master/LICENSE)
 
-English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-launcher)
+English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-launcher-panel)
 
 Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built-in browser.
 
@@ -25,7 +25,7 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 
 ## Usage
 
-Click the DSH Launcher whale icon in the activity bar, then click **Start**.
+Click the DSH Launcher Panel whale icon in the activity bar, then click **Start**.
 
 ## Settings
 
@@ -45,7 +45,7 @@ Settings → search "dsh":
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **API Status** card supports DeepSeek only for now — it only shows when a DeepSeek model is configured in dsh.
-* Log file: `%TEMP%\dsh-launcher-vscode.log`
+* Log file: `%TEMP%\dsh-launcher-panel.log`
 * DSH cannot run "minimal mode" properly on Windows for now.
 
 ## Environment

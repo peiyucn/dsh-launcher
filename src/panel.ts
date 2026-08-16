@@ -480,7 +480,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await openUrl('https://status.deepseek.com/')
         break
       case 'openSettings':
-        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:peiyucn.dsh-launcher-vscode')
+        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:peiyucn.dsh-launcher-panel')
         break
       case 'clearConsole':
         clearConsole()
@@ -519,7 +519,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       await this.view.webview.postMessage({ type: 'update', status, activity, browser, dsStatus, consoleSize, balance, showDs })
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      console.error('[dsh-launcher-vscode] refresh failed:', error)
+      console.error('[dsh-launcher-panel] refresh failed:', error)
       // Typed fallback so it stays in sync with ServerStatus (no drifting fields).
       const cfg = readConfig()
       const fallback: ServerStatus = {

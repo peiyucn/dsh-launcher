@@ -1,10 +1,10 @@
-# DSH Launcher
+# DSH Launcher Panel
 
-[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-vscode)
-[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher--vscode-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-vscode)
-[![License](https://img.shields.io/github/license/peiyucn/dsh-launcher?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher/blob/master/LICENSE)
+[![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-launcher-panel?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-panel)
+[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-dsh--launcher--panel-blue?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=peiyucn.dsh-launcher-panel)
+[![License](https://img.shields.io/github/license/peiyucn/dsh-launcher-panel?style=for-the-badge)](https://github.com/peiyucn/dsh-launcher-panel/blob/master/LICENSE)
 
-简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-launcher)
+简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-launcher-panel)
 
 在 VS Code 内启动 **DeepSeek Harness**（dsh），并在内置浏览器中打开它的 Web UI。
 
@@ -25,7 +25,7 @@
 
 ## 使用方法
 
-点击活动栏中的 DSH Launcher 小鲸鱼图标，然后点击 **Start**。
+点击活动栏中的 DSH Launcher Panel 小鲸鱼图标，然后点击 **Start**。
 
 ## 设置
 
@@ -45,7 +45,7 @@
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在dsh里配置了 DeepSeek 模型时才会显示。
-* 日志文件：`%TEMP%\dsh-launcher-vscode.log`
+* 日志文件：`%TEMP%\dsh-launcher-panel.log`
 * DSH在Windows下暂无法正常运行“极简模式”。
 
 ## 环境

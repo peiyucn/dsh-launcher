@@ -1,18 +1,18 @@
 {
-  "name": "dsh-launcher-vscode",
-  "displayName": "DSH Launcher for VS Code",
+  "name": "dsh-launcher-panel",
+  "displayName": "DSH Launcher Panel",
   "description": "Start the DeepSeek Harness web UI and open it in VS Code's built-in browser.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "icon": "resources/icon.png",
   "publisher": "peiyucn",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/peiyucn/dsh-launcher.git"
+    "url": "https://github.com/peiyucn/dsh-launcher-panel.git"
   },
   "homepage": "https://pyai.site/",
   "bugs": {
-    "url": "https://github.com/peiyucn/dsh-launcher/issues"
+    "url": "https://github.com/peiyucn/dsh-launcher-panel/issues"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -33,7 +33,7 @@
       "activitybar": [
         {
           "id": "dsh",
-          "title": "🐳 DSH Launcher",
+          "title": "🐳 DSH Launcher Panel",
           "icon": "resources/icon.svg"
         }
       ]
@@ -51,11 +51,11 @@
       {
         "command": "dsh.start",
         "title": "Start",
-        "category": "DSH Launcher"
+        "category": "DSH Launcher Panel"
       }
     ],
     "configuration": {
-      "title": "DSH Launcher",
+      "title": "DSH Launcher Panel",
       "properties": {
         "dsh.mode": {
           "type": "string",

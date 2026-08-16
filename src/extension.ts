@@ -6,7 +6,7 @@ import { DshPanelProvider } from './panel'
 import { currentStatus, dbg, registerConfigWatcher, setLogPath } from './server'
 
 export function activate(context: vscode.ExtensionContext): void {
-  setLogPath(path.join(os.tmpdir(), 'dsh-launcher-vscode.log'))
+  setLogPath(path.join(os.tmpdir(), 'dsh-launcher-panel.log'))
   dbg('activated')
 
   const panelProvider = new DshPanelProvider(context.extension.packageJSON.version ?? '0.0.0')

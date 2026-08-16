@@ -42,5 +42,5 @@ jobs:
           body: |
             ## ${{ github.ref_name }}
 
-            See [CHANGELOG](https://github.com/peiyucn/dsh-launcher/blob/master/CHANGELOG.md) and [README](https://github.com/peiyucn/dsh-launcher#readme).
+            See [CHANGELOG](https://github.com/peiyucn/dsh-launcher-panel/blob/master/CHANGELOG.md) and [README](https://github.com/peiyucn/dsh-launcher-panel#readme).
           files: releases/*.vsix
