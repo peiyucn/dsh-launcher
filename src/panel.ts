@@ -277,7 +277,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         if (!status.dshPath) {
           // No checkout configured: invite the user to configure it
           // (clicking opens the extension settings).
-          runtimePath.textContent = '⚠ not configured — click to set dsh.path'
+          runtimePath.textContent = 'click to set dsh.path'
           runtimePath.title = 'Open extension settings'
           runtimePath.classList.add('missing')
           runtimePath.dataset.openSettings = '1'
