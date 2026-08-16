@@ -8,6 +8,8 @@
 
 在 VS Code 内启动 **DeepSeek Harness**（dsh），并在内置浏览器中打开它的 Web UI。
 
+![DSH Launcher Panel](https://raw.githubusercontent.com/peiyucn/dsh-launcher-panel/dev/resources/dsh-launcher-panel.png)
+
 > 本扩展**不**附带任何 LLM 模型、DeepSeek Harness 本身，或 DeepSeek API Key。
 
 ## 设计原则
@@ -18,9 +20,9 @@
 ## 功能
 
 * **启动 / 停止** — 通过 `npx` 运行 dsh，并在就绪后打开 Web UI。
-* **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为检出目录（需包含 `apps/cli/src/bin.ts`）。
+* **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为 deepseek-harness 的 git clone 目录。刚 clone 下来也能直接用——首次启动时会提示自动执行 `pnpm install` + 构建。
 * **仪表盘面板** — 服务状态、实时控制台、DeepSeek 官方 API 状态以及你的账户余额。
-* **DSH 更新** — 仅源码运行：点击 Update 按钮检查上游，发现新提交时拉取。
+* **DSH 更新** — 仅源码运行：点击刷新按钮（⟳）检查新版本；有更新时会出现带新版本号的 Update 按钮，点击即可拉取更新。
 * **浏览器选择** — 内置浏览器或系统浏览器。
 
 ## 使用方法
@@ -35,10 +37,9 @@
 | --------------- | --------- | ----------------------------------------------------------- |
 | dsh.browser     | built-in  | built-in 或 external                                         |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
-| dsh.path        | 空         | source 模式的源码检出路径（必须包含 apps/cli/src/bin.ts）                  |
+| dsh.path        | 空         | source 模式的 deepseek-harness 检出路径（首次启动会提示自动构建）                  |
 | dsh.nodePath    | 空         | node.exe 路径；留空则使用 PATH 上的 node                              |
 | dsh.port        | 3080      | Web UI 端口                                                   |
-| dsh.host        | 127.0.0.1 | Web UI 监听地址                                                 |
 
 ## 说明
 

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
+import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -118,6 +118,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .footer { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
   .setting { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .setting select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: 12px; }
+  .balance-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 4px; padding: 2px 10px; font-size: 11px; font-family: inherit; cursor: pointer; flex: none; }
+  .balance-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+  .balance-btn:disabled { opacity: .6; cursor: progress; }
   .version-row { display: flex; justify-content: flex-end; }
   .plugin-version { font-size: 10px; color: var(--vscode-descriptionForeground); opacity: .65; }
 </style>
@@ -178,7 +181,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="ds-components" id="dsComponents"></div>
     <div class="balance-row">
-      <button class="mini-btn" id="balanceBtn" title="Query DeepSeek account balance">Balance</button>
+      <button class="balance-btn" id="balanceBtn" title="Query DeepSeek account balance">Balance</button>
       <span class="balance-value" id="balanceValue"></span>
     </div>
     <div class="ds-incidents" id="dsIncidents"></div>
@@ -385,7 +388,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     let refreshingBalance = false
     document.getElementById('balanceBtn').addEventListener('click', () => {
       refreshingBalance = true
-      document.getElementById('balanceBtn').classList.add('spinning')
+      document.getElementById('balanceBtn').disabled = true
+      document.getElementById('balanceValue').textContent = 'querying…'
       vscode.postMessage({ command: 'balance' })
     })
 
@@ -415,7 +419,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       }
       if (refreshingBalance) {
         refreshingBalance = false
-        document.getElementById('balanceBtn').classList.remove('spinning')
+        document.getElementById('balanceBtn').disabled = false
       }
       document.getElementById('browserSelect').value = m.browser || 'built-in'
       document.getElementById('consoleSize').textContent = fmtSize(m.consoleSize)
@@ -471,7 +475,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         if (message.value) void vscode.env.openExternal(vscode.Uri.file(message.value))
         break
       case 'balance':
+        addActivity('↻ Querying DeepSeek balance…')
         await fetchDshBalance()
+        {
+          const b = getDshBalance()
+          if (b?.balance) addActivity(`✓ Balance: ${b.balance.total} ${b.balance.currency}`)
+          else addActivity(`⚠ Balance: ${b?.error ?? 'no balance data'}`)
+        }
         break
       case 'setBrowser':
         if (message.value) await actionSetBrowser(message.value)

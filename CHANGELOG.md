@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - unreleased
+
+- Balance button: secondary style and instant feedback (disabled + "querying…" + a console log with the result).
+- Removed the unused `dsh.host` setting; the extension always targets 127.0.0.1, where dsh binds.
+- Docs: added a panel screenshot and corrected the source-run and update descriptions.
+
 ## [0.1.1] - 2026-08-16
 
 - The "Starting…" status now reads "Starting DeepSeek Harness Web UI…".

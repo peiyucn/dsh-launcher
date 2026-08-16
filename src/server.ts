@@ -32,13 +32,15 @@ export { fetchDshBalance, getDshBalance, getDsStatus, hasDeepSeekModel } from '.
 
 export type DshMode = 'npx' | 'source'
 
+/** dsh binds loopback only; the launcher probes and opens this fixed host. */
+const LOOPBACK_HOST = '127.0.0.1'
+
 /** Resolved extension settings (dsh.*). */
 export interface DshConfig {
   mode: DshMode
   path: string
   nodePath: string
   port: number
-  host: string
 }
 
 export type ConditionState = 'unknown' | 'ok' | 'missing'
@@ -91,7 +93,6 @@ export function readConfig(): DshConfig {
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
-    host: c.get<string>('host') ?? '127.0.0.1',
   }
 }
 
@@ -112,7 +113,7 @@ export function registerConfigWatcher(): vscode.Disposable {
 }
 
 export function uiUrl(cfg: DshConfig = readConfig()): string {
-  return `http://${cfg.host}:${cfg.port}`
+  return `http://${LOOPBACK_HOST}:${cfg.port}`
 }
 
 export function setLogPath(value: string): void {
@@ -152,7 +153,7 @@ function pushActivity(entry: string): void {
 }
 
 /** Append one line to the panel activity feed + the log file. */
-function addActivity(line: string): void {
+export function addActivity(line: string): void {
   const entry = `[${new Date().toLocaleTimeString()}] ${line}`
   pushActivity(entry)
   appendLog(entry)
@@ -537,7 +538,7 @@ async function waitForPort(cfg: DshConfig, timeoutMs: number): Promise<boolean> 
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     await sleep(PORT_POLL_INTERVAL_MS)
-    if (await isPortOpen(cfg.host, cfg.port, PORT_PROBE_FAST_MS)) {
+    if (await isPortOpen(LOOPBACK_HOST, cfg.port, PORT_PROBE_FAST_MS)) {
       starting = false
       addActivity(`✓ Server started ${uiUrl(cfg)}`)
       return true
@@ -600,7 +601,7 @@ async function ensureCheckoutReady(checkout: string): Promise<boolean> {
 /** Make sure the server is running (no re-entrancy guard). */
 async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   detectDshVersion(cfg)
-  if (await isPortOpen(cfg.host, cfg.port)) {
+  if (await isPortOpen(LOOPBACK_HOST, cfg.port)) {
     nodeState = 'ok'
     dshState = 'ok'
     addActivity(`✓ Server already running ${uiUrl(cfg)}`)
@@ -724,12 +725,12 @@ async function stopServerUnlocked(): Promise<boolean> {
   addActivity('■ Stopping server…')
   for (let i = 0; i < STOP_POLL_ATTEMPTS; i++) {
     await sleep(STOP_POLL_INTERVAL_MS)
-    if (!(await isPortOpen(cfg.host, cfg.port, STOP_POLL_PROBE_MS))) {
+    if (!(await isPortOpen(LOOPBACK_HOST, cfg.port, STOP_POLL_PROBE_MS))) {
       addActivity('■ Server stopped')
       return true
     }
   }
-  const stillOpen = await isPortOpen(cfg.host, cfg.port, STOP_POLL_PROBE_MS)
+  const stillOpen = await isPortOpen(LOOPBACK_HOST, cfg.port, STOP_POLL_PROBE_MS)
   addActivity(stillOpen ? '⚠ Could not stop the server — the port is still in use' : '■ Server stopped')
   return !stillOpen
 }
@@ -741,7 +742,7 @@ export function stopServer(): Promise<boolean> {
 /** Whether the dsh server port is open (fast probe). */
 export async function isServerRunning(): Promise<boolean> {
   const cfg = readConfig()
-  return isPortOpen(cfg.host, cfg.port)
+  return isPortOpen(LOOPBACK_HOST, cfg.port)
 }
 
 /** Check for a newer dsh version (source mode only: git commits ahead of upstream). */
@@ -793,7 +794,7 @@ export async function currentStatus(): Promise<ServerStatus> {
   const cfg = readConfig()
   let running = false
   try {
-    running = await isPortOpen(cfg.host, cfg.port)
+    running = await isPortOpen(LOOPBACK_HOST, cfg.port)
   } catch {
     running = false
   }

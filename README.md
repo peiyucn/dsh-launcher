@@ -8,6 +8,8 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built-in browser.
 
+![DSH Launcher Panel](https://raw.githubusercontent.com/peiyucn/dsh-launcher-panel/dev/resources/dsh-launcher-panel.png)
+
 > This extension does **not** ship an LLM model, DeepSeek Harness itself, or a DeepSeek API key.
 
 ## Principles
@@ -18,9 +20,9 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 ## Features
 
 * **Start / Stop** — runs dsh via `npx` and opens the web UI once it is ready.
-* **Source run (optional)** — run from a local checkout: set `dsh.path` to the checkout folder (must contain `apps/cli/src/bin.ts`).
+* **Source run (optional)** — run from a local checkout: set `dsh.path` to a deepseek-harness git clone. A fresh clone works — on first start the extension offers to run `pnpm install` + build for you.
 * **Dashboard panel** — server status, a live console, the official DeepSeek API status, and your account balance.
-* **DSH Update** — source run only: click the Update button to check upstream, and pull when new commits are found.
+* **DSH Update** — source run only: click the refresh button (⟳) to check for updates; when one is available, an Update button labeled with the new version appears, and clicking it pulls the update.
 * **Browser choice** — built-in or system browser.
 
 ## Usage
@@ -35,10 +37,9 @@ Settings → search "dsh":
 |---|---|---|
 | dsh.browser | built-in | built-in or external |
 | dsh.hideConsole | true | Hide the console on Windows |
-| dsh.path | empty | Source-checkout path for source mode (must contain apps/cli/src/bin.ts) |
+| dsh.path | empty | Path to a deepseek-harness git clone for source mode (first start offers to build it) |
 | dsh.nodePath | empty | Path to node.exe; empty uses the node on PATH |
 | dsh.port | 3080 | Web UI port |
-| dsh.host | 127.0.0.1 | Web UI host |
 
 ## Notes
 
