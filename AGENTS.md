@@ -25,28 +25,34 @@ VS Code 扩展「DSH Launcher Panel」：启动 DeepSeek Harness（dsh），并�
 * **逐项提交**：每完成一个独立任务**必须**单独 `git commit`，禁止多个任务混在一个 commit
 * **诚实原则**：不确定的事直接说"不确定"，禁止编造事实性信息
 
+### 分支
+
+* **日常开发一律在 `dev` 分支**（仓库默认分支）
+* `master` 只接受发布合并，不直接在上面开发
+
 ### Push
 
 * push 前**必须**先验证打包（`npm run compile` + `npm run package`），成功才允许推送
-* 推送目标分支：`master`（主分支，也是 CI 触发分支）
+* 日常推送目标：`dev`
 
 ### 发布（Tag 触发）
 
 发布走 **git tag** 触发 GitHub Actions 自动发布（见 `.github/workflows/release.yml`），流程：
 
 ```
-改代码 → commit → 验证打包 → push master → 打 tag → push tag 触发 release
+改代码 → commit → 验证打包 → push dev → 合并 dev 到 master → push master → 打 tag → push tag 触发 release
 ```
 
 **严格顺序：**
 
-1. **确认改动已提交并推送**到 `master`
+1. **确认改动已提交并推送**到 `dev`
 2. **更新 `package.json` 版本号**（`version` 字段）
 3. **更新 `README.md` + `README.zh-CN.md`**：如有功能变更，同步更新文档
 4. **再次验证打包**：`npm run compile` + `npm run package`
-5. **commit 版本更新**：`docs: 发布 vX.Y.Z` 或 `chore: bump version to X.Y.Z`
+5. **合并到 master**：`git checkout master && git merge dev`，提交版本更新：`docs: 发布 vX.Y.Z` 或 `chore: bump version to X.Y.Z`
 6. **push**：`git push origin master`
 7. **打 tag 触发发布**：`git tag -a vX.Y.Z -m "vX.Y.Z: <简述>" && git push origin vX.Y.Z`
+8. **切回 dev 继续开发**：`git checkout dev`
 
 > tag 推送后 GitHub Actions 自动：打包 VSIX → 发布到 VS Code Marketplace → 创建 GitHub Release 并附上 VSIX。
 
@@ -56,7 +62,7 @@ VS Code 扩展「DSH Launcher Panel」：启动 DeepSeek Harness（dsh），并�
 
 | Workflow | 触发 | 作用 |
 | :--- | :--- | :--- |
-| `.github/workflows/ci.yml` | push / PR 到 `master` | `npm ci` + `tsc` 编译 + 验证 `vsce package` 打包成功 |
+| `.github/workflows/ci.yml` | push / PR 到 `master`、`dev` | `npm ci` + `tsc` 编译 + 验证 `vsce package` 打包成功 |
 | `.github/workflows/release.yml` | 推送 `v*.*.*` tag | 打包 + 发布市场 + GitHub Release |
 
 * 发布需要仓库配置 `VSCE_PAT` Secret（VS Code Marketplace 发布令牌）
