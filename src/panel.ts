@@ -253,7 +253,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         const justStarted = startElapsed()
         if (justStarted) statusSub.textContent = 'Waited 0s'
         dot.className = 'dot working'
-        statusText.textContent = 'Starting DeepSeek Harness…'
+        statusText.textContent = 'Starting DeepSeek Harness Web UI…'
         startBtn.textContent = 'Starting…'
         startBtn.disabled = true
       } else {
