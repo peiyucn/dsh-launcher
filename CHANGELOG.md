@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2026-08-17
+
+- Fixed: the balance query now reads the DeepSeek API key from every location dsh does (env, `.credentials.yaml`, `.env`), so it no longer reports "no key" when dsh is already configured.
+- Code cleanup: removed dead code and enabled stricter compiler flags.
+
 ## [0.1.2] - 2026-08-17
 
 - Balance button: secondary style and instant feedback (disabled + "querying…" + a console log with the result).
