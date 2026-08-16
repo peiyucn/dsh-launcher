@@ -2,10 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.1] - unreleased
-
-- Renamed to "DSH Launcher Panel": new extension id `peiyucn.dsh-launcher-panel`, repository renamed to dsh-launcher-panel, display name, READMEs and project files updated accordingly.
-
 ## [0.1.0] - 2026-08-16
 
 - Initial release: start DeepSeek Harness (dsh) from VS Code and open its web UI.
