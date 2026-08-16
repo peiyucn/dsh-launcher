@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.2] - unreleased
+## [0.1.2] - 2026-08-17
 
 - Balance button: secondary style and instant feedback (disabled + "querying…" + a console log with the result).
 - Removed the unused `dsh.host` setting; the extension always targets 127.0.0.1, where dsh binds.
