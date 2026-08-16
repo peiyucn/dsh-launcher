@@ -21,7 +21,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     this.view = view
     dbg(`view resolved, visible=${view.visible}`)
     view.webview.options = { enableScripts: true }
-    view.webview.html = this.getHtml(view.webview)
+    view.webview.html = this.getHtml()
     view.webview.onDidReceiveMessage((message: { command?: string; value?: string }) => {
       dbg(`message from webview: ${JSON.stringify(message)}`)
       if (message && message.command === 'ready') {
@@ -40,7 +40,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     void this.refresh()
   }
 
-  private getHtml(webview: vscode.Webview): string {
+  private getHtml(): string {
     const nonce = getNonce()
     return `<!DOCTYPE html>
 <html lang="en">

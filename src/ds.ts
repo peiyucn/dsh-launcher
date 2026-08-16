@@ -156,7 +156,6 @@ function parseDsStatus(json: any): DsStatus {
   }
 }
 
-
 /** Read one line-based credential from a file; `pattern` matches `key<sep>value`. */
 function readLineCredential(name: string, file: string, pattern: RegExp): string | undefined {
   try {
