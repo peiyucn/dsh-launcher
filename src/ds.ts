@@ -157,14 +157,12 @@ function parseDsStatus(json: any): DsStatus {
 }
 
 
-/** Read a credential from the environment (wins) or `$DSH_HOME/.credentials.yaml`. */
-function readCredential(name: string): string | undefined {
-  if (process.env[name]) return process.env[name]
-  const file = path.join(resolveDshHome(), '.credentials.yaml')
+/** Read one line-based credential from a file; `pattern` matches `key<sep>value`. */
+function readLineCredential(name: string, file: string, pattern: RegExp): string | undefined {
   try {
     const text = fs.readFileSync(file, 'utf8')
     for (const line of text.split(/\r?\n/)) {
-      const m = /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*:\s*(.*?)\s*$/.exec(line)
+      const m = pattern.exec(line)
       if (!m || m[1] !== name) continue
       let value = m[2]
       if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
@@ -173,9 +171,21 @@ function readCredential(name: string): string | undefined {
       return value
     }
   } catch {
-    // no credentials file
+    // no such file
   }
   return undefined
+}
+
+/**
+ * Resolve a credential exactly where dsh does: the inherited environment
+ * wins, then `$DSH_HOME/.credentials.yaml` (the Models-page store), then the
+ * invoking directory's `.env`, then `$DSH_HOME/.env`.
+ */
+function readCredential(name: string): string | undefined {
+  if (process.env[name]) return process.env[name]
+  return readLineCredential(name, path.join(resolveDshHome(), '.credentials.yaml'), /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*:\s*(.*?)\s*$/)
+    ?? readLineCredential(name, path.join(process.cwd(), '.env'), /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*?)\s*$/)
+    ?? readLineCredential(name, path.join(resolveDshHome(), '.env'), /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*?)\s*$/)
 }
 
 /** Read the default Agent model selection from settings.yaml. */
