@@ -156,18 +156,19 @@ function parseDsStatus(json: any): DsStatus {
   }
 }
 
-/** Read one line-based credential from a file; `pattern` matches `key<sep>value`. */
-function readLineCredential(name: string, file: string, pattern: RegExp): string | undefined {
+/** Read a credential from a flat name:value / name=value mapping (block or flow style). */
+function readCredentialFromFile(name: string, file: string): string | undefined {
   try {
     const text = fs.readFileSync(file, 'utf8')
-    for (const line of text.split(/\r?\n/)) {
-      const m = pattern.exec(line)
-      if (!m || m[1] !== name) continue
-      let value = m[2]
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1)
-      }
-      return value
+    // Whole-file scan: matches KEY: value / KEY= value in both block style
+    // (one per line) and flow style ({ KEY: value }, which dsh writes), with
+    // quoted or bare values.
+    const re = /(?:^|[{\s,])([A-Za-z_][A-Za-z0-9_.-]*)\s*[:=]\s*(?:"([^"]*)"|'([^']*)'|([^\s,}]+))/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      if (m[1] !== name) continue
+      const value = m[2] ?? m[3] ?? m[4]
+      if (value !== undefined) return value
     }
   } catch {
     // no such file
@@ -182,9 +183,9 @@ function readLineCredential(name: string, file: string, pattern: RegExp): string
  */
 function readCredential(name: string): string | undefined {
   if (process.env[name]) return process.env[name]
-  return readLineCredential(name, path.join(resolveDshHome(), '.credentials.yaml'), /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*:\s*(.*?)\s*$/)
-    ?? readLineCredential(name, path.join(process.cwd(), '.env'), /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*?)\s*$/)
-    ?? readLineCredential(name, path.join(resolveDshHome(), '.env'), /^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*?)\s*$/)
+  return readCredentialFromFile(name, path.join(resolveDshHome(), '.credentials.yaml'))
+    ?? readCredentialFromFile(name, path.join(process.cwd(), '.env'))
+    ?? readCredentialFromFile(name, path.join(resolveDshHome(), '.env'))
 }
 
 /** Read the default Agent model selection from settings.yaml. */
