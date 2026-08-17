@@ -12,7 +12,6 @@ import {
   PORT_PROBE_FAST_MS,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
-  START_TIMEOUT_MS,
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
@@ -168,6 +167,12 @@ function displayLine(line: string): void {
   const trimmed = line.trimEnd()
   if (!trimmed) return
   pushActivity(`[${new Date().toLocaleTimeString()}] ${trimmed}`)
+  // npx announces a first/updated install; surface it clearly so the user
+  // knows the start will take longer.
+  const install = /will be installed:[^\n]*dsh@([0-9][^\s"']*)/.exec(trimmed)
+  if (install) {
+    pushActivity(`[${new Date().toLocaleTimeString()}] ℹ dsh v${install[1]} is being installed via npx — first start takes longer; please wait`)
+  }
 }
 
 /** Append one raw server output line to the activity feed + log file. */
@@ -547,10 +552,12 @@ function spawnNpm(cfg: DshConfig): void {
   spawnServer('npx', ['-y', '@deepseek-ai/dsh', 'web', '--port', String(cfg.port)], undefined, process.platform === 'win32')
 }
 
-/** Poll the port until it opens or `timeoutMs` elapses. */
-async function waitForPort(cfg: DshConfig, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
+/** Poll the port until it opens, the spawned process dies, or the user stops. */
+async function waitForPort(cfg: DshConfig): Promise<boolean> {
+  // No hard timeout: the first start of a new dsh version installs many
+  // packages and can take several minutes. The fail-fast below still reports
+  // a dead spawn, and Stop stays available from the panel.
+  while (true) {
     await sleep(PORT_POLL_INTERVAL_MS)
     if (await isPortOpen(LOOPBACK_HOST, cfg.port, PORT_PROBE_FAST_MS)) {
       starting = false
@@ -564,8 +571,6 @@ async function waitForPort(cfg: DshConfig, timeoutMs: number): Promise<boolean> 
       return false
     }
   }
-  starting = false
-  return false
 }
 
 /**
@@ -653,12 +658,12 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
       return false
     }
     spawnSource(repoPath, cfg)
-    return waitForPort(cfg, START_TIMEOUT_MS)
+    return waitForPort(cfg)
   }
 
   // npx (and legacy auto) both use the official npx method (source needs explicit opt-in)
   spawnNpm(cfg)
-  return waitForPort(cfg, START_TIMEOUT_MS)
+  return waitForPort(cfg)
 }
 
 /**

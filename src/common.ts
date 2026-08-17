@@ -12,8 +12,6 @@ export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
 
 // --- Timing (ms) ---
 
-/** How long to wait for the server to open its port after spawning. */
-export const START_TIMEOUT_MS = 120_000
 export const PORT_PROBE_TIMEOUT_MS = 500
 export const PORT_PROBE_FAST_MS = 400
 export const PORT_POLL_INTERVAL_MS = 500
