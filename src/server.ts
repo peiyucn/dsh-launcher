@@ -365,13 +365,10 @@ function detectDshVersion(cfg: DshConfig): void {
       // fall through to installed package
     }
   }
-  // npx mode: show what npx will actually run (its cache), not the profile.
+  // npx mode: only the npx cache counts (npx reinstalls from the registry on demand).
   if (cfg.mode === 'npx') {
-    const cached = npxCachedDshVersion()
-    if (cached) {
-      dshVersion = cached
-      return
-    }
+    dshVersion = npxCachedDshVersion() ?? ''
+    return
   }
   try {
     const link = path.join(resolveDshHome(), 'profiles', 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
