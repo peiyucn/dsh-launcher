@@ -1,6 +1,7 @@
 import * as fs from 'node:fs'
 import * as net from 'node:net'
 import * as path from 'node:path'
+import * as os from 'node:os'
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import * as vscode from 'vscode'
 import {
@@ -12,6 +13,7 @@ import {
   PORT_PROBE_FAST_MS,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
+  START_HINT_MS,
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
@@ -78,6 +80,7 @@ let nodeState: ConditionState = 'unknown'
 let dshState: ConditionState = 'unknown'
 let starting = false
 let logTailWatcher: fs.FSWatcher | undefined
+let logTailTimer: ReturnType<typeof setInterval> | undefined
 let logTailOffset = 0
 let logTailBuffer = ''
 let dshVersion = ''
@@ -167,12 +170,6 @@ function displayLine(line: string): void {
   const trimmed = line.trimEnd()
   if (!trimmed) return
   pushActivity(`[${new Date().toLocaleTimeString()}] ${trimmed}`)
-  // npx announces a first/updated install; surface it clearly so the user
-  // knows the start will take longer.
-  const install = /will be installed:[^\n]*dsh@([0-9][^\s"']*)/.exec(trimmed)
-  if (install) {
-    pushActivity(`[${new Date().toLocaleTimeString()}] ℹ dsh v${install[1]} is being installed via npx — first start takes longer; please wait`)
-  }
 }
 
 /** Append one raw server output line to the activity feed + log file. */
@@ -253,6 +250,50 @@ async function checkNpm(): Promise<{ ok: boolean; version: string }> {
   return { ok: result.ok, version }
 }
 
+/** Read the newest @deepseek-ai/dsh version cached under the npx cache. */
+function npxCachedDshVersion(): string | undefined {
+  const cacheRoot = process.platform === 'win32'
+    ? (process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'npm-cache') : undefined)
+    : path.join(os.homedir(), '.npm')
+  if (!cacheRoot) return undefined
+  let best: string | undefined
+  try {
+    for (const entry of fs.readdirSync(path.join(cacheRoot, '_npx'), { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      try {
+        const pkg = JSON.parse(fs.readFileSync(path.join(cacheRoot, '_npx', entry.name, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')) as { version?: string }
+        const v = pkg?.version
+        if (v && (best === undefined || v > best)) best = v
+      } catch {
+        // no dsh package in this npx slot
+      }
+    }
+  } catch {
+    // no npx cache
+  }
+  return best
+}
+
+/** Resolve the latest published @deepseek-ai/dsh version (undefined on failure). */
+async function latestDshVersion(): Promise<string | undefined> {
+  const result = process.platform === 'win32'
+    ? await runFile('cmd', ['/c', 'npm', 'view', '@deepseek-ai/dsh', 'version'], 10_000)
+    : await runFile('npm', ['view', '@deepseek-ai/dsh', 'version'], 10_000)
+  if (!result.ok) return undefined
+  return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
+}
+
+/** Announce a first/updated npx install in the console (non-blocking). */
+async function noteNpxInstall(): Promise<void> {
+  const latest = await latestDshVersion()
+  if (!latest) return
+  const cached = npxCachedDshVersion()
+  if (cached === undefined) {
+    addActivity(`ℹ dsh v${latest} will be installed on first run — downloading it can take a while; please wait`)
+  } else if (cached !== latest) {
+    addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — npx will update it before starting; this can take a while`)
+  }
+}
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
 function isDshCheckout(dir: string | undefined): boolean {
   if (!dir) return false
@@ -320,6 +361,14 @@ function detectDshVersion(cfg: DshConfig): void {
       }
     } catch {
       // fall through to installed package
+    }
+  }
+  // npx mode: show what npx will actually run (its cache), not the profile.
+  if (cfg.mode === 'npx') {
+    const cached = npxCachedDshVersion()
+    if (cached) {
+      dshVersion = cached
+      return
     }
   }
   try {
@@ -418,9 +467,15 @@ function startLogTail(): void {
   pump()
   logTailWatcher = fs.watch(logPath, () => pump())
   logTailWatcher.on('error', () => {})
+  // fs.watch can miss appends on Windows; poll as a reliable fallback.
+  logTailTimer = setInterval(() => pump(), 500)
 }
 
 function stopLogTail(): void {
+  if (logTailTimer) {
+    clearInterval(logTailTimer)
+    logTailTimer = undefined
+  }
   logTailWatcher?.close()
   logTailWatcher = undefined
   if (logTailBuffer) {
@@ -554,6 +609,8 @@ function spawnNpm(cfg: DshConfig): void {
 
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
 async function waitForPort(cfg: DshConfig): Promise<boolean> {
+  const startedAt = Date.now()
+  let hintShown = false
   // No hard timeout: the first start of a new dsh version installs many
   // packages and can take several minutes. The fail-fast below still reports
   // a dead spawn, and Stop stays available from the panel.
@@ -569,6 +626,10 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
       starting = false
       addActivity('✗ Server exited before opening the port (see the log above)')
       return false
+    }
+    if (!hintShown && Date.now() - startedAt >= START_HINT_MS) {
+      hintShown = true
+      addActivity(`ℹ Still starting after ${Math.round(START_HINT_MS / 1000)}s — first start of a new dsh version can take a while; please wait`)
     }
   }
 }
@@ -591,11 +652,26 @@ function checkoutReady(checkout: string): boolean {
     || fs.existsSync(path.join(checkout, 'node_modules', '.bin', 'tsx'))
 }
 
+/** Whether the checkout's installed deps predate its lockfile (a stale install). */
+function checkoutDepsStale(checkout: string): boolean {
+  try {
+    const lock = fs.statSync(path.join(checkout, 'pnpm-lock.yaml')).mtimeMs
+    const installed = fs.statSync(path.join(checkout, 'node_modules', '.pnpm', 'lock.yaml')).mtimeMs
+    return lock > installed
+  } catch {
+    // Can't compare (missing marker): treat as not stale.
+    return false
+  }
+}
+
 /** Prompt to set up a fresh checkout, then run `pnpm install` + `pnpm run build`. */
 async function ensureCheckoutReady(checkout: string): Promise<boolean> {
-  if (checkoutReady(checkout)) return true
+  const stale = checkoutDepsStale(checkout)
+  if (checkoutReady(checkout) && !stale) return true
   const pick = await vscode.window.showInformationMessage(
-    'This deepseek-harness checkout is not set up. Run `pnpm install` and `pnpm run build`?',
+    stale
+      ? 'This deepseek-harness checkout has outdated dependencies. Run `pnpm install` and `pnpm run build`?'
+      : 'This deepseek-harness checkout is not set up. Run `pnpm install` and `pnpm run build`?',
     'Setup now',
     'Cancel',
   )
@@ -662,6 +738,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   }
 
   // npx (and legacy auto) both use the official npx method (source needs explicit opt-in)
+  void noteNpxInstall()
   spawnNpm(cfg)
   return waitForPort(cfg)
 }
