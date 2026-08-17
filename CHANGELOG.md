@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2026-08-18
+
+- Fixed: the balance query now parses `.credentials.yaml` in flow style (`{ KEY: value }`) as well as block style, so it no longer reports "no key" after model settings are re-saved.
+- Added npm to the Requirements card (version + availability), with a bounded probe so a hung npm can't freeze the panel.
+- Start no longer gives up after a fixed timeout: it waits indefinitely, and when npx installs a new/first dsh version the console announces the version number and warns that the first start takes longer.
+
 ## [0.1.3] - 2026-08-17
 
 - Fixed: the balance query now reads the DeepSeek API key from every location dsh does (env, `.credentials.yaml`, `.env`), so it no longer reports "no key" when dsh is already configured.
