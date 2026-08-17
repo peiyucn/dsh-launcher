@@ -286,14 +286,15 @@ async function latestDshVersion(): Promise<string | undefined> {
 /** Announce a first/updated npx install in the console (non-blocking). */
 async function noteNpxInstall(): Promise<void> {
   const cached = npxCachedDshVersion()
-  if (cached === undefined) {
-    // First run: announce immediately (no network call) so the user expects a slow install.
-    addActivity('ℹ dsh is not installed yet — npx will download it on first run; this can take a while, please wait')
-    return
-  }
   const latest = await latestDshVersion()
   if (latest && latest !== cached) {
-    addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — npx will update it before starting; this can take a while`)
+    // Unified: a first install (no cache) and an upgrade (stale cache) both
+    // mean npx will download and install `latest`.
+    const detail = cached ? ` (cached: v${cached})` : ''
+    addActivity(`ℹ dsh v${latest}${detail} — npx will install it before starting; this can take a while, please wait`)
+  } else if (!latest && cached === undefined) {
+    // Registry unreachable and nothing cached: warn generically.
+    addActivity('ℹ dsh is not installed yet — npx will download it on first run; this can take a while, please wait')
   }
 }
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
