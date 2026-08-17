@@ -618,7 +618,9 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
     await sleep(PORT_POLL_INTERVAL_MS)
     if (await isPortOpen(LOOPBACK_HOST, cfg.port, PORT_PROBE_FAST_MS)) {
       starting = false
-      addActivity(`✓ Server started ${uiUrl(cfg)}`)
+      const secs = Math.round((Date.now() - startedAt) / 1000)
+      const dur = secs >= 60 ? `${Math.floor(secs / 60)}m${secs % 60}s` : `${secs}s`
+      addActivity(`✓ Server started ${uiUrl(cfg)} in ${dur}`)
       return true
     }
     // Fail fast when the spawned process already exited (e.g. port already in use).
