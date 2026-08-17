@@ -157,12 +157,17 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     <div class="req-header">
       <span class="req-title">Requirements</span>
       <span class="req-hint" id="refreshHint"></span>
-      <button class="icon-btn" id="refreshBtn" title="Re-check Node / DSH / updates">⟳</button>
+      <button class="icon-btn" id="refreshBtn" title="Re-check Node / npm / DSH / updates">⟳</button>
     </div>
     <div class="req-row">
       <span class="req-name">Node</span>
       <span class="req-value" id="nodeVersion">—</span>
       <span class="req-mark" id="req-node">·</span>
+    </div>
+    <div class="req-row">
+      <span class="req-name">npm</span>
+      <span class="req-value" id="npmVersion">—</span>
+      <span class="req-mark" id="req-npm">·</span>
     </div>
     <div class="req-row">
       <span class="req-name">DSH</span>
@@ -298,8 +303,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     function renderRequirements(status) {
       status = status || {}
       document.getElementById('nodeVersion').textContent = status.nodeVersion || (status.node === 'missing' ? 'not found' : '—')
+      document.getElementById('npmVersion').textContent = status.npmVersion || (status.npm === 'missing' ? 'not found' : '—')
       document.getElementById('dshVersion').textContent = status.dshVersion ? ('v' + status.dshVersion) : (status.dsh === 'missing' ? 'not found' : '—')
       setMark('req-node', status.node)
+      setMark('req-npm', status.npm)
       setMark('req-dsh', status.dsh)
 
       const upd = status.update
@@ -537,6 +544,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         starting: false,
         url: '',
         node: 'unknown',
+        npm: 'unknown',
         dsh: 'unknown',
         dshVersion: '',
         dshSource: '',
@@ -545,6 +553,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         dshPathShort: '',
         dshHomeShort: '',
         nodeVersion: '',
+        npmVersion: '',
         mode: cfg.mode,
         update: undefined,
       }

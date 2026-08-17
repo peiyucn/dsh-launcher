@@ -74,10 +74,10 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** Run a command without a shell (no cmd window flash on Windows). */
-export function runFile(command: string, args: string[]): Promise<{ ok: boolean; stdout: string }> {
+/** Run a command without a shell (no cmd window flash on Windows); `timeoutMs` bounds a hung probe. */
+export function runFile(command: string, args: string[], timeoutMs = 0): Promise<{ ok: boolean; stdout: string }> {
   return new Promise((resolve) => {
-    execFile(command, args, { windowsHide: true }, (error, stdout) => {
+    execFile(command, args, { windowsHide: true, timeout: timeoutMs > 0 ? timeoutMs : undefined }, (error, stdout) => {
       resolve({ ok: !error, stdout: stdout ?? '' })
     })
   })
@@ -86,7 +86,7 @@ export function runFile(command: string, args: string[]): Promise<{ ok: boolean;
 /** Resolve a command on PATH (returns the first match, or undefined). */
 export async function findOnPath(cmd: string): Promise<string | undefined> {
   const which = process.platform === 'win32' ? 'where' : 'which'
-  const result = await runFile(which, [cmd])
+  const result = await runFile(which, [cmd], 8_000)
   if (!result.ok) return undefined
   const first = result.stdout.trim().split(/\r?\n/)[0]
   return first || undefined
