@@ -285,12 +285,14 @@ async function latestDshVersion(): Promise<string | undefined> {
 
 /** Announce a first/updated npx install in the console (non-blocking). */
 async function noteNpxInstall(): Promise<void> {
-  const latest = await latestDshVersion()
-  if (!latest) return
   const cached = npxCachedDshVersion()
   if (cached === undefined) {
-    addActivity(`ℹ dsh v${latest} will be installed on first run — downloading it can take a while; please wait`)
-  } else if (cached !== latest) {
+    // First run: announce immediately (no network call) so the user expects a slow install.
+    addActivity('ℹ dsh is not installed yet — npx will download it on first run; this can take a while, please wait')
+    return
+  }
+  const latest = await latestDshVersion()
+  if (latest && latest !== cached) {
     addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — npx will update it before starting; this can take a while`)
   }
 }
@@ -610,7 +612,7 @@ function spawnNpm(cfg: DshConfig): void {
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
 async function waitForPort(cfg: DshConfig): Promise<boolean> {
   const startedAt = Date.now()
-  let hintShown = false
+  let lastHintAt = 0
   // No hard timeout: the first start of a new dsh version installs many
   // packages and can take several minutes. The fail-fast below still reports
   // a dead spawn, and Stop stays available from the panel.
@@ -627,9 +629,10 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
       addActivity('✗ Server exited before opening the port (see the log above)')
       return false
     }
-    if (!hintShown && Date.now() - startedAt >= START_HINT_MS) {
-      hintShown = true
-      addActivity(`ℹ Still starting after ${Math.round(START_HINT_MS / 1000)}s — first start of a new dsh version can take a while; please wait`)
+    const elapsed = Date.now() - startedAt
+    if (elapsed >= START_HINT_MS && elapsed - lastHintAt >= 60_000) {
+      lastHintAt = elapsed
+      addActivity(`ℹ Still starting after ${Math.round(elapsed / 1000)}s — first start of a new dsh version can take a while; please wait`)
     }
   }
 }
