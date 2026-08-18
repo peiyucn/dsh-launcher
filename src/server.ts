@@ -1022,7 +1022,9 @@ export function clearConsole(): void {
     try {
       fs.writeFileSync(file, '')
     } catch {
-      // best effort (the server may hold its log open)
+      if (file === logPath) {
+        pushActivity('⚠ 服务端日志被占用(server 运行中),未能清空;先 Stop 再 Clear')
+      }
     }
   }
 }
