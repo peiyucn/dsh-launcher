@@ -458,15 +458,18 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.getElementById('consoleSize').textContent = fmtSize(m.consoleSize)
       const log = document.getElementById('log')
       const entries = Array.isArray(m.activity) ? m.activity : []
-      const text = entries.map((e) => e.text).join('\n')
+      const newline = String.fromCharCode(10)
+      const text = entries.map((e) => e.text).join(newline)
       const hasNew = log.dataset.activity !== text
       log.dataset.activity = text
       let logHtml = entries.map((e) => {
         const txt = esc(e.text)
         if (!e.busy) return txt
-        // Swap the leading icon (whatever char follows the timestamp) for a spinner.
-        return txt.replace(/^(\[[^\]]*\]\s)./, '$1<span class="spin">⠋</span>')
-      }).join('\n')
+        // Swap the leading icon (the char right after the timestamp) for a spinner.
+        const close = txt.indexOf('] ')
+        if (close === -1) return txt
+        return txt.slice(0, close + 2) + '<span class="spin">⠋</span>' + txt.slice(close + 3)
+      }).join(newline)
       if (entries.some((e) => e.busy)) startSpin()
       else stopSpin()
       log.innerHTML = logHtml || '(no activity yet)'
