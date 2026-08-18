@@ -463,7 +463,11 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       let logHtml = esc(activity)
       const spinning = (m.status && m.status.starting) || wasRefreshing || wasBalancing
       if (spinning) {
-        logHtml = logHtml.replace(/▶/g, '<span class="spin">⠋</span>').replace(/↻/g, '<span class="spin">⠋</span>')
+        const spin = '<span class="spin">⠋</span>'
+        for (const mark of ['▶', '↻']) {
+          const i = logHtml.lastIndexOf(mark)
+          if (i !== -1) logHtml = logHtml.slice(0, i) + spin + logHtml.slice(i + mark.length)
+        }
         startSpin()
       } else {
         stopSpin()
