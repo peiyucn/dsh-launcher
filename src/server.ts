@@ -41,6 +41,8 @@ export interface DshConfig {
   path: string
   nodePath: string
   port: number
+  /** Print module-loading progress in source mode (NODE_DEBUG=module). */
+  sourceDebug: boolean
 }
 
 export type ConditionState = 'unknown' | 'ok' | 'missing'
@@ -104,6 +106,7 @@ export function readConfig(): DshConfig {
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
+    sourceDebug: c.get<boolean>('sourceDebug') ?? false,
   }
 }
 
@@ -532,10 +535,14 @@ function stopLogTail(): void {
  * `-PassThru` echoes the cmd.exe PID, which stays alive for the server's
  * lifetime (cmd /c blocks on the server process).
  */
-function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | undefined): void {
+function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | undefined, env?: Record<string, string>): void {
   const program = quoteCmdArg(cmd)
   const rest = args.map(quoteCmdArg).join(' ')
-  const run = rest ? `${program} ${rest}` : program
+  let run = rest ? `${program} ${rest}` : program
+  if (env) {
+    const setEnv = Object.entries(env).map(([k, v]) => `set ${k}=${v}`).join('&& ')
+    run = `${setEnv}&& ${run}`
+  }
   const inner = `${run} >> ${quoteCmdArg(logPath)} 2>&1`
   const wd = cwd ? `-WorkingDirectory '${psQuote(cwd)}' ` : ''
   const script =
@@ -577,7 +584,7 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
  * Spawn the DSH server with no console window (Windows) and stream its
  * stdout/stderr into the dashboard activity feed + log file.
  */
-function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell = false): void {
+function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell = false, env?: Record<string, string>): void {
   trackedPid = undefined
   starting = true
   fs.mkdirSync(path.dirname(logPath), { recursive: true })
@@ -585,7 +592,7 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
   const hideConsole = vscode.workspace.getConfiguration('dsh').get<boolean>('hideConsole') ?? true
 
   if (process.platform === 'win32' && hideConsole) {
-    spawnHiddenViaPowerShell(cmd, args, cwd)
+    spawnHiddenViaPowerShell(cmd, args, cwd, env)
     return
   }
 
@@ -595,6 +602,7 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
     windowsHide: hideConsole,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: env ? { ...process.env, ...env } : undefined,
   })
   child.unref()
   trackedChild = child
@@ -629,7 +637,8 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   addActivity('✓ dsh detected (source run)')
   addActivity('ℹ source 启动会用 tsx 即时转译 TypeScript，首次启动较慢，请耐心等待')
   addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts web --port ${cfg.port}`, true)
-  spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath)
+  const env = cfg.sourceDebug ? { NODE_DEBUG: 'module' } : undefined
+  spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath, false, env)
 }
 
 /** npx mode: run the official `npx @deepseek-ai/dsh web` command. */

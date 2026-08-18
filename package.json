@@ -90,6 +90,11 @@
           "type": "number",
           "default": 3080,
           "description": "Port the web UI listens on."
+        },
+        "dsh.sourceDebug": {
+          "type": "boolean",
+          "default": false,
+          "description": "In source mode, enable NODE_DEBUG=module to print module-loading progress (very verbose; off by default)."
         }
       }
     }
