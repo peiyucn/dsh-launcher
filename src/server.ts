@@ -956,7 +956,6 @@ export async function currentStatus(): Promise<ServerStatus> {
 
 /** Force the next refresh to re-probe node/dsh and re-check for dsh updates. */
 export async function clearRequirementsCaches(): Promise<void> {
-  addActivity('↻ Re-checking requirements…')
   detectionCache = undefined
   updateCache = undefined
   const update = await checkDshUpdateStatus(readConfig())

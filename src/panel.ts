@@ -432,10 +432,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.getElementById('browserSelect').value = m.browser || 'built-in'
       document.getElementById('consoleSize').textContent = fmtSize(m.consoleSize)
       const log = document.getElementById('log')
-      let logHtml = esc(m.activity || '(no activity yet)')
+      const activity = m.activity || '(no activity yet)'
+      const hasNew = log.dataset.activity !== activity
+      log.dataset.activity = activity
+      let logHtml = esc(activity)
       if (m.status && m.status.starting) logHtml = logHtml.replace(/▶/g, '<span class="spin">▶</span>')
       log.innerHTML = logHtml
-      log.scrollTop = log.scrollHeight
+      if (hasNew) log.scrollTop = log.scrollHeight
       const dsCard = document.getElementById('dsCard')
       if (dsCard) dsCard.style.display = m.showDs === false ? 'none' : ''
       renderRunning(m.status)
@@ -460,7 +463,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await runDshUpdate()
         break
       case 'refreshRequirements':
+        addActivity('↻ Re-checking requirements…')
+        await this.refresh()
         await clearRequirementsCaches()
+        addActivity('✓ Requirements re-checked')
         break
       case 'setMode':
         if (message.value === 'npx' || message.value === 'source') {
