@@ -461,17 +461,17 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const hasNew = log.dataset.activity !== activity
       log.dataset.activity = activity
       let logHtml = esc(activity)
-      const spinning = (m.status && m.status.starting) || wasRefreshing || wasBalancing
-      if (spinning) {
-        const spin = '<span class="spin">⠋</span>'
-        for (const mark of ['▶', '↻']) {
-          const i = logHtml.lastIndexOf(mark)
-          if (i !== -1) logHtml = logHtml.slice(0, i) + spin + logHtml.slice(i + mark.length)
-        }
-        startSpin()
-      } else {
-        stopSpin()
+      const spin = '<span class="spin">⠋</span>'
+      const spinMark = (mark) => {
+        const i = logHtml.lastIndexOf(mark)
+        if (i !== -1) logHtml = logHtml.slice(0, i) + spin + logHtml.slice(i + mark.length)
       }
+      const startSpinning = !!(m.status && m.status.starting)
+      const reqSpinning = wasRefreshing || wasBalancing
+      if (startSpinning) spinMark('▶')
+      if (reqSpinning) spinMark('↻')
+      if (startSpinning || reqSpinning) startSpin()
+      else stopSpin()
       log.innerHTML = logHtml
       if (hasNew) log.scrollTop = log.scrollHeight
       const dsCard = document.getElementById('dsCard')
