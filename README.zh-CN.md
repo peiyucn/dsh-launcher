@@ -40,7 +40,8 @@
 | dsh.path        | 空         | source 模式的 deepseek-harness 检出路径（首次启动会提示自动构建）                  |
 | dsh.nodePath    | 空         | node.exe 路径；留空则使用 PATH 上的 node                              |
 | dsh.port        | 3080      | Web UI 端口                                                   |
-| dsh.sourceDebug | true      | source 模式打印模块加载进度（NODE_DEBUG=module，输出很多；console 显示周期性计数，完整明细在服务端日志） |
+| dsh.sourceDebug | false     | source 模式打印模块加载进度（NODE_DEBUG=module，输出很多；console 显示周期性计数，完整明细在服务端日志） |
+| dsh.clearServerLogOnStart | true  | 每次启动前清空服务端日志文件，使其只包含本次运行内容 |
 
 ## 说明
 

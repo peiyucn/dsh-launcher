@@ -106,7 +106,7 @@ export function readConfig(): DshConfig {
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
-    sourceDebug: c.get<boolean>('sourceDebug') ?? true,
+    sourceDebug: c.get<boolean>('sourceDebug') ?? false,
   }
 }
 
@@ -611,6 +611,16 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
   trackedPid = undefined
   starting = true
   fs.mkdirSync(path.dirname(logPath), { recursive: true })
+  // Each start gets a fresh server log (dsh.clearServerLogOnStart, default on)
+  // — otherwise output from every previous run accumulates (NODE_DEBUG=module
+  // alone produced a ~90MB file) and mixes with the current run.
+  if (vscode.workspace.getConfiguration('dsh').get<boolean>('clearServerLogOnStart') ?? true) {
+    try {
+      fs.writeFileSync(logPath, '')
+    } catch {
+      // Best effort: a just-stopped server may still hold the file open.
+    }
+  }
 
   const hideConsole = vscode.workspace.getConfiguration('dsh').get<boolean>('hideConsole') ?? true
 

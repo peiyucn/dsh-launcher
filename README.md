@@ -40,7 +40,8 @@ Settings → search "dsh":
 | dsh.path | empty | Path to a deepseek-harness git clone for source mode (first start offers to build it) |
 | dsh.nodePath | empty | Path to node.exe; empty uses the node on PATH |
 | dsh.port | 3080 | Web UI port |
-| dsh.sourceDebug | true | Print module-loading progress in source mode (NODE_DEBUG=module, very verbose; console shows a periodic count, full detail in the server log) |
+| dsh.sourceDebug | false | Print module-loading progress in source mode (NODE_DEBUG=module, very verbose; console shows a periodic count, full detail in the server log) |
+| dsh.clearServerLogOnStart | true | Clear the server log file at the start of each launch so it only contains the current run |
 
 ## Notes
 

@@ -93,8 +93,13 @@
         },
         "dsh.sourceDebug": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "In source mode, enable NODE_DEBUG=module to print module-loading progress (very verbose; the console shows a periodic count, full detail is in the server log)."
+        },
+        "dsh.clearServerLogOnStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Clear the server log file at the start of each launch so it only contains the current run."
         }
       }
     }
