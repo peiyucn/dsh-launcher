@@ -90,6 +90,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .icon-btn.spinning { animation: spin 1s linear infinite; }
   .spin { display: inline-block; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--vscode-editor-background); z-index: 10; transition: opacity .2s ease; }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-spinner { width: 28px; height: 28px; border: 3px solid var(--vscode-panel-border); border-top-color: #4D6BFE; border-radius: 50%; animation: spin 1s linear infinite; }
+  .loading-text { color: var(--vscode-descriptionForeground); font-size: 12px; }
   .req-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
   .req-name { width: 56px; flex: none; color: var(--vscode-descriptionForeground); }
   .req-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-foreground); }
@@ -127,6 +131,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
 </style>
 </head>
 <body>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading…</div>
+  </div>
   <div class="card">
     <div class="status">
       <span class="dot" id="dot"></span>
@@ -220,6 +228,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         const st = document.getElementById('statusText')
         if (st && st.textContent === 'Checking…') st.textContent = '⚠ No status updates received'
       }
+      document.getElementById('loadingOverlay').classList.add('hidden')
     }, 6000)
 
     function esc(s) {
@@ -420,6 +429,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const m = e.data
       if (!m || m.type !== 'update') return
       gotUpdate = true
+      document.getElementById('loadingOverlay').classList.add('hidden')
       if (refreshingReqs) {
         refreshingReqs = false
         document.getElementById('refreshBtn').classList.remove('spinning')
