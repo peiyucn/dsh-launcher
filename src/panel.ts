@@ -207,14 +207,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   </div>
   <pre class="console" id="log"></pre>
   <div class="log-files">
-    <div class="runtime-row">
-      <span class="runtime-label">log</span>
-      <span class="runtime-path" id="launcherLogPath" data-log="1"></span>
-    </div>
-    <div class="runtime-row">
-      <span class="runtime-label">server</span>
-      <span class="runtime-path" id="serverLogPath" data-log="1"></span>
-    </div>
+    <span class="runtime-path" id="launcherLogPath" data-log="1"></span>
+    <span class="runtime-path" id="serverLogPath" data-log="1"></span>
   </div>
   <div class="footer">
     <button class="icon-btn" id="settingsBtn" title="Open extension settings">⚙ Settings</button>
