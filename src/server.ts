@@ -66,6 +66,10 @@ export interface ServerStatus {
   consoleLogPathShort: string
   serverLogPath: string
   serverLogPathShort: string
+  consoleLogSize: number
+  serverLogSize: number
+  /** Whether NODE_DEBUG=module is enabled in source mode. */
+  sourceDebug: boolean
 }
 
 export interface DshUpdate {
@@ -217,11 +221,11 @@ export function finishBusy(): void {
   }
 }
 
-/** Size of the persisted console log in bytes (0 when absent). */
-export function getConsoleSize(): number {
-  if (!consolePath) return 0
+/** Size of a file in bytes, 0 when absent or unreadable. */
+function fileSizeSafe(p: string): number {
+  if (!p) return 0
   try {
-    return fs.statSync(consolePath).size
+    return fs.statSync(p).size
   } catch {
     return 0
   }
@@ -1003,6 +1007,9 @@ export async function currentStatus(): Promise<ServerStatus> {
     consoleLogPathShort: maskPath(consolePath),
     serverLogPath: logPath,
     serverLogPathShort: maskPath(logPath),
+    consoleLogSize: fileSizeSafe(consolePath),
+    serverLogSize: fileSizeSafe(logPath),
+    sourceDebug: cfg.sourceDebug,
   }
 }
 

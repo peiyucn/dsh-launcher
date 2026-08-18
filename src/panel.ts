@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
+import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -78,10 +78,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   button.secondary:hover { background: var(--vscode-toolbar-hoverBackground); }
   button.danger:hover { border-color: #f85149; color: #f85149; background: rgba(248,81,73,.1); }
   .console { height: 200px; margin: 0; padding: 8px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); font-size: 11px; }
-  .log-files { border-top: 1px solid var(--vscode-panel-border); margin-top: 6px; padding-top: 4px; display: flex; flex-direction: column; gap: 3px; }
+  .log-files { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .log-file-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .log-size { color: var(--vscode-descriptionForeground); font-size: 10px; opacity: .65; flex: none; }
   .console-header { display: flex; align-items: center; gap: 6px; }
   .console-title { font-weight: 600; font-size: 11px; }
-  .console-size { color: var(--vscode-descriptionForeground); font-size: 10px; margin-left: auto; }
+  .debug-pill { border: 1px solid var(--vscode-panel-border); border-radius: 999px; padding: 0 8px; font-size: 10px; font-weight: 600; line-height: 18px; cursor: pointer; background: transparent; color: var(--vscode-descriptionForeground); flex: none; font-family: inherit; }
+  .debug-pill.on { color: #2ea043; border-color: rgba(46,160,67,.4); background: rgba(46,160,67,.12); }
   .console-header .mini-btn { flex: none; }
   .req-header { display: flex; align-items: center; gap: 6px; }
   .req-title { font-weight: 600; }
@@ -124,7 +127,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .balance-row { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; margin-top: 2px; display: flex; align-items: center; gap: 8px; font-size: 11px; }
   .balance-value { color: var(--vscode-foreground); }
   .update-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-  .footer { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
+  .footer { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
   .setting { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .setting select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: 12px; }
   .balance-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 4px; padding: 2px 10px; font-size: 11px; font-family: inherit; cursor: pointer; flex: none; }
@@ -202,13 +205,19 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   </div>
   <div class="console-header">
     <span class="console-title">Console</span>
-    <span class="console-size" id="consoleSize"></span>
+    <button class="debug-pill" id="debugToggle" title="Toggle NODE_DEBUG=module in source mode">debug off</button>
     <button class="mini-btn" id="clearConsoleBtn" title="Clear console log">Clear</button>
   </div>
   <pre class="console" id="log"></pre>
   <div class="log-files">
-    <span class="runtime-path" id="launcherLogPath" data-log="1"></span>
-    <span class="runtime-path" id="serverLogPath" data-log="1"></span>
+    <div class="log-file-row">
+      <span class="runtime-path" id="launcherLogPath" data-log="1"></span>
+      <span class="log-size" id="launcherLogSize"></span>
+    </div>
+    <div class="log-file-row">
+      <span class="runtime-path" id="serverLogPath" data-log="1"></span>
+      <span class="log-size" id="serverLogSize"></span>
+    </div>
   </div>
   <div class="footer">
     <button class="icon-btn" id="settingsBtn" title="Open extension settings">⚙ Settings</button>
@@ -344,6 +353,24 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         server.textContent = status.serverLogPathShort || ''
         server.title = status.serverLogPath || ''
       }
+      const launcherSize = document.getElementById('launcherLogSize')
+      const serverSize = document.getElementById('serverLogSize')
+      if (launcherSize) launcherSize.textContent = fmtSize(status.consoleLogSize)
+      if (serverSize) serverSize.textContent = fmtSize(status.serverLogSize)
+    }
+
+    function renderDebug(status) {
+      const pill = document.getElementById('debugToggle')
+      if (!pill) return
+      // NODE_DEBUG=module only applies to source mode; hide the pill under npx.
+      if (status && status.mode !== 'source') {
+        pill.style.display = 'none'
+        return
+      }
+      pill.style.display = ''
+      const on = !!(status && status.sourceDebug)
+      pill.textContent = on ? 'debug on' : 'debug off'
+      pill.className = 'debug-pill' + (on ? ' on' : '')
     }
 
     function renderDs(ds) {
@@ -398,6 +425,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     document.getElementById('dsOpenBtn').addEventListener('click', () => vscode.postMessage({ command: 'openStatus' }))
     document.getElementById('settingsBtn').addEventListener('click', () => vscode.postMessage({ command: 'openSettings' }))
     document.getElementById('clearConsoleBtn').addEventListener('click', () => vscode.postMessage({ command: 'clearConsole' }))
+    document.getElementById('debugToggle').addEventListener('click', () => vscode.postMessage({ command: 'toggleDebug' }))
     document.getElementById('browserSelect').addEventListener('change', (e) => {
       vscode.postMessage({ command: 'setBrowser', value: e.target.value })
     })
@@ -487,7 +515,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         document.getElementById('balanceBtn').disabled = false
       }
       document.getElementById('browserSelect').value = m.browser || 'built-in'
-      document.getElementById('consoleSize').textContent = fmtSize(m.consoleSize)
       const log = document.getElementById('log')
       const entries = Array.isArray(m.activity) ? m.activity : []
       const newline = String.fromCharCode(10)
@@ -511,6 +538,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       renderRunning(m.status)
       renderRequirements(m.status)
       renderLogFiles(m.status)
+      renderDebug(m.status)
       renderDs(m.dsStatus)
       renderBalance(m.balance)
       renderPricing()
@@ -595,6 +623,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:peiyucn.dsh-launcher-panel')
         break
+      case 'toggleDebug': {
+        const cfg = vscode.workspace.getConfiguration('dsh')
+        const cur = cfg.get<boolean>('sourceDebug') ?? false
+        await cfg.update('sourceDebug', !cur, vscode.ConfigurationTarget.Global)
+        await this.refresh()
+        break
+      }
       case 'clearConsole':
         clearConsole()
         break
@@ -627,9 +662,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const browser = vscode.workspace.getConfiguration('dsh').get<string>('browser') ?? 'built-in'
       const showDs = hasDeepSeekModel()
       const dsStatus = showDs ? await getDsStatus() : undefined
-      const consoleSize = getConsoleSize()
       const balance = showDs ? getDshBalance() : undefined
-      await this.view.webview.postMessage({ type: 'update', status, activity, browser, dsStatus, consoleSize, balance, showDs })
+      await this.view.webview.postMessage({ type: 'update', status, activity, browser, dsStatus, balance, showDs })
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       console.error('[dsh-launcher-panel] refresh failed:', error)
@@ -654,6 +688,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         consoleLogPathShort: '',
         serverLogPath: '',
         serverLogPathShort: '',
+        consoleLogSize: 0,
+        serverLogSize: 0,
+        sourceDebug: false,
       }
       try {
         await this.view.webview.postMessage({
@@ -661,7 +698,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
           status: fallback,
           activity: [{ text: `✗ Status refresh failed: ${msg}`, busy: false }],
           browser: 'built-in',
-          consoleSize: 0,
           balance: undefined,
         })
       } catch {
