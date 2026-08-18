@@ -443,6 +443,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (!m || m.type !== 'update') return
       gotUpdate = true
       document.getElementById('loadingOverlay').classList.add('hidden')
+      const wasRefreshing = refreshingReqs
+      const wasBalancing = refreshingBalance
       if (refreshingReqs) {
         refreshingReqs = false
         document.getElementById('refreshBtn').classList.remove('spinning')
@@ -459,8 +461,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const hasNew = log.dataset.activity !== activity
       log.dataset.activity = activity
       let logHtml = esc(activity)
-      if (m.status && m.status.starting) {
-        logHtml = logHtml.replace(/▶/g, '<span class="spin">⠋</span>')
+      const spinning = (m.status && m.status.starting) || wasRefreshing || wasBalancing
+      if (spinning) {
+        logHtml = logHtml.replace(/▶/g, '<span class="spin">⠋</span>').replace(/↻/g, '<span class="spin">⠋</span>')
         startSpin()
       } else {
         stopSpin()
