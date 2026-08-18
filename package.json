@@ -40,7 +40,7 @@
       "activitybar": [
         {
           "id": "dsh",
-          "title": "🐳 DSH Launcher Panel",
+          "title": "🐳DSH WebUI",
           "icon": "resources/icon.svg"
         }
       ]
@@ -50,7 +50,7 @@
         {
           "type": "webview",
           "id": "dsh.panel",
-          "name": "🐳DSH WebUI: Dashboard",
+          "name": "Dashboard",
           "icon": "resources/icon.svg"
         }
       ]
