@@ -88,6 +88,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .icon-btn { background: transparent; border: none; border-radius: 4px; color: var(--vscode-foreground); cursor: pointer; padding: 2px 4px; font-size: 12px; flex: none; }
   .icon-btn:hover { color: var(--vscode-textLink-foreground); }
   .icon-btn.spinning { animation: spin 1s linear infinite; }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .req-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
   .req-name { width: 56px; flex: none; color: var(--vscode-descriptionForeground); }
@@ -330,7 +331,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         const stCls = compStateClass(st)
         html += '<div class="ds-comp"><span class="ds-comp-name" title="' + esc(c.name) + '">' + esc(c.name) + '</span><span class="cdot' + (stCls ? ' ' + stCls : '') + '"></span></div>'
       }
-      list.innerHTML = html || '<div class="ds-empty">No component data</div>'
+      list.innerHTML = html || '<div class="ds-empty">' + (ds.state === 'unknown' ? 'Status unavailable — check your network' : 'No component data') + '</div>'
       const inc = document.getElementById('dsIncidents')
       const incs = ds.incidents || []
       inc.innerHTML = incs.map((i) => '<div class="ds-incident">⚠ ' + esc(i.title) + (i.status ? ' · ' + incidentLabel(i.status) : '') + '</div>').join('')
@@ -431,7 +432,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.getElementById('browserSelect').value = m.browser || 'built-in'
       document.getElementById('consoleSize').textContent = fmtSize(m.consoleSize)
       const log = document.getElementById('log')
-      log.textContent = m.activity || '(no activity yet)'
+      let logHtml = esc(m.activity || '(no activity yet)')
+      if (m.status && m.status.starting) logHtml = logHtml.replace(/▶/g, '<span class="spin">▶</span>')
+      log.innerHTML = logHtml
       log.scrollTop = log.scrollHeight
       const dsCard = document.getElementById('dsCard')
       if (dsCard) dsCard.style.display = m.showDs === false ? 'none' : ''

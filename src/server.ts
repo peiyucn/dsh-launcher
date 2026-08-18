@@ -283,19 +283,30 @@ async function latestDshVersion(): Promise<string | undefined> {
   return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
 }
 
-/** Announce a first/updated npx install in the console (non-blocking). */
-async function noteNpxInstall(): Promise<void> {
+/** Prepare the npx start: verify the registry when a download is required, and announce installs. Returns false to abort. */
+async function prepareNpxInstall(): Promise<boolean> {
   const cached = npxCachedDshVersion()
-  const latest = await latestDshVersion()
-  if (latest && latest !== cached) {
-    // Unified: a first install (no cache) and an upgrade (stale cache) both
-    // mean npx will download and install `latest`.
-    const detail = cached ? ` (cached: v${cached})` : ''
-    addActivity(`ℹ dsh v${latest}${detail} — npx will install it before starting; this can take a while, please wait`)
-  } else if (!latest && cached === undefined) {
-    // Registry unreachable and nothing cached: warn generically.
-    addActivity('ℹ dsh is not installed yet — npx will download it on first run; this can take a while, please wait')
+  if (cached === undefined) {
+    // Nothing cached: npx must download dsh, so verify the registry is
+    // reachable first; a network outage should fail fast, not hang the start.
+    const latest = await latestDshVersion()
+    if (!latest) {
+      dshState = 'missing'
+      addActivity('✗ dsh is not installed and the npm registry is unreachable — check your network and try again')
+      void vscode.window.showErrorMessage('DeepSeek Harness: unable to reach the npm registry to install dsh. Check your network connection.')
+      return false
+    }
+    addActivity(`ℹ dsh v${latest} — npx will install it on first run; this can take a while, please wait`)
+    return true
   }
+  // Cached: optionally announce an upgrade (best-effort, non-blocking).
+  void (async () => {
+    const latest = await latestDshVersion()
+    if (latest && latest !== cached) {
+      addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — npx will update it before starting; this can take a while`)
+    }
+  })()
+  return true
 }
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
 function isDshCheckout(dir: string | undefined): boolean {
@@ -398,8 +409,12 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
     return { state: 'missing', source: '', path: '' }
   }
-  if (await findOnPath('npx')) return { state: 'ok', source: 'npx', path: '' }
-  return { state: 'missing', source: '', path: '' }
+  if (!(await findOnPath('npx'))) return { state: 'missing', source: '', path: '' }
+  // npx present: 'ok' only when dsh is already cached; otherwise the first
+  // start will download it, so mark it 'unknown' (version stays empty).
+  return npxCachedDshVersion() !== undefined
+    ? { state: 'ok', source: 'npx', path: '' }
+    : { state: 'unknown', source: 'npx', path: '' }
 }
 
 /** Run a command in a visible VS Code terminal (used for updates). */
@@ -741,7 +756,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   }
 
   // npx (and legacy auto) both use the official npx method (source needs explicit opt-in)
-  void noteNpxInstall()
+  if (!(await prepareNpxInstall())) return false
   spawnNpm(cfg)
   return waitForPort(cfg)
 }
