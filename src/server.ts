@@ -75,7 +75,13 @@ let trackedPid: number | undefined
 let logPath = ''
 let consolePath = ''
 let busy: Promise<boolean> | undefined
-const activity: string[] = []
+/** One line in the panel activity feed; `busy` marks an in-progress operation. */
+interface ActivityEntry {
+  text: string
+  busy: boolean
+}
+
+const activity: ActivityEntry[] = []
 let nodeState: ConditionState = 'unknown'
 let dshState: ConditionState = 'unknown'
 let starting = false
@@ -153,15 +159,15 @@ export function dbg(line: string): void {
   appendLog(`[${new Date().toLocaleTimeString()}] [dbg] ${line}`)
 }
 
-function pushActivity(entry: string): void {
-  activity.push(entry)
+function pushActivity(entry: string, isBusy = false): void {
+  activity.push({ text: entry, busy: isBusy })
   if (activity.length > ACTIVITY_MAX_LINES) activity.splice(0, activity.length - ACTIVITY_MAX_LINES)
 }
 
 /** Append one line to the panel activity feed + the log file. */
-export function addActivity(line: string): void {
+export function addActivity(line: string, isBusy = false): void {
   const entry = `[${new Date().toLocaleTimeString()}] ${line}`
-  pushActivity(entry)
+  pushActivity(entry, isBusy)
   appendLog(entry)
 }
 
@@ -181,8 +187,18 @@ function appendOutput(line: string): void {
 }
 
 /** The panel activity feed (Start/Stop command dynamics), newest last. */
-export function getActivity(): string {
-  return activity.join('\n')
+export function getActivity(): ActivityEntry[] {
+  return activity
+}
+
+/** Mark the most recent busy entry as finished (its operation completed). */
+export function finishBusy(): void {
+  for (let i = activity.length - 1; i >= 0; i--) {
+    if (activity[i].busy) {
+      activity[i].busy = false
+      return
+    }
+  }
 }
 
 /** Size of the persisted console log in bytes (0 when absent). */
@@ -609,7 +625,7 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   const node = cfg.nodePath || 'node'
   dshState = 'ok'
   addActivity('✓ dsh detected (source run)')
-  addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts web --port ${cfg.port}`)
+  addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts web --port ${cfg.port}`, true)
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath)
 }
 
@@ -617,7 +633,7 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
 function spawnNpm(cfg: DshConfig): void {
   dshState = 'ok'
   addActivity('✓ dsh detected (npx run)')
-  addActivity(`▶ Start: ${NPX_RUN_COMMAND} --port ${cfg.port}`)
+  addActivity(`▶ Start: ${NPX_RUN_COMMAND} --port ${cfg.port}`, true)
   // Windows: npx is a .cmd shim, so run it through the shell.
   spawnServer('npx', ['-y', '@deepseek-ai/dsh', 'web', '--port', String(cfg.port)], undefined, process.platform === 'win32')
 }
@@ -636,12 +652,14 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
       const secs = Math.round((Date.now() - startedAt) / 1000)
       const dur = secs >= 60 ? `${Math.floor(secs / 60)}m${secs % 60}s` : `${secs}s`
       addActivity(`✓ Server started ${uiUrl(cfg)} in ${dur}`)
+      finishBusy()
       return true
     }
     // Fail fast when the spawned process already exited (e.g. port already in use).
     if (trackedPid !== undefined && !isProcessAlive(trackedPid)) {
       starting = false
       addActivity('✗ Server exited before opening the port (see the log above)')
+      finishBusy()
       return false
     }
     const elapsed = Date.now() - startedAt

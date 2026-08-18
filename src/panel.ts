@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
+import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getConsoleSize, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -457,22 +457,19 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.getElementById('browserSelect').value = m.browser || 'built-in'
       document.getElementById('consoleSize').textContent = fmtSize(m.consoleSize)
       const log = document.getElementById('log')
-      const activity = m.activity || '(no activity yet)'
-      const hasNew = log.dataset.activity !== activity
-      log.dataset.activity = activity
-      let logHtml = esc(activity)
-      const spin = '<span class="spin">⠋</span>'
-      const spinMark = (mark) => {
-        const i = logHtml.lastIndexOf(mark)
-        if (i !== -1) logHtml = logHtml.slice(0, i) + spin + logHtml.slice(i + mark.length)
-      }
-      const startSpinning = !!(m.status && m.status.starting)
-      const reqSpinning = wasRefreshing || wasBalancing
-      if (startSpinning) spinMark('▶')
-      if (reqSpinning) spinMark('↻')
-      if (startSpinning || reqSpinning) startSpin()
+      const entries = Array.isArray(m.activity) ? m.activity : []
+      const text = entries.map((e) => e.text).join('\n')
+      const hasNew = log.dataset.activity !== text
+      log.dataset.activity = text
+      let logHtml = entries.map((e) => {
+        const txt = esc(e.text)
+        if (!e.busy) return txt
+        // Swap the leading icon (whatever char follows the timestamp) for a spinner.
+        return txt.replace(/^(\[[^\]]*\]\s)./, '$1<span class="spin">⠋</span>')
+      }).join('\n')
+      if (entries.some((e) => e.busy)) startSpin()
       else stopSpin()
-      log.innerHTML = logHtml
+      log.innerHTML = logHtml || '(no activity yet)'
       if (hasNew) log.scrollTop = log.scrollHeight
       const dsCard = document.getElementById('dsCard')
       if (dsCard) dsCard.style.display = m.showDs === false ? 'none' : ''
@@ -498,7 +495,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await runDshUpdate()
         break
       case 'refreshRequirements':
-        addActivity('↻ Re-checking requirements…')
+        addActivity('↻ Re-checking requirements…', true)
         await this.refresh()
         await clearRequirementsCaches()
         {
@@ -509,6 +506,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
           const upd = st.update && st.update.hasUpdate ? ' · update → ' + st.update.label : ''
           addActivity(`✓ Re-checked: Node ${node} · npm ${npm} · DSH ${dsh}${upd}`)
         }
+        finishBusy()
         break
       case 'setMode':
         if (message.value === 'npx' || message.value === 'source') {
@@ -533,13 +531,14 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         if (message.value) void vscode.env.openExternal(vscode.Uri.file(message.value))
         break
       case 'balance':
-        addActivity('↻ Querying DeepSeek balance…')
+        addActivity('↻ Querying DeepSeek balance…', true)
         await fetchDshBalance()
         {
           const b = getDshBalance()
           if (b?.balance) addActivity(`✓ Balance: ${b.balance.total} ${b.balance.currency}`)
           else addActivity(`⚠ Balance: ${b?.error ?? 'no balance data'}`)
         }
+        finishBusy()
         break
       case 'setBrowser':
         if (message.value) await actionSetBrowser(message.value)
@@ -612,7 +611,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await this.view.webview.postMessage({
           type: 'update',
           status: fallback,
-          activity: `✗ Status refresh failed: ${msg}`,
+          activity: [{ text: `✗ Status refresh failed: ${msg}`, busy: false }],
           browser: 'built-in',
           consoleSize: 0,
           balance: undefined,
