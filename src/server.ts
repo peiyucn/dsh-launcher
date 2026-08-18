@@ -129,8 +129,11 @@ export function uiUrl(cfg: DshConfig = readConfig()): string {
 }
 
 export function setLogPath(value: string): void {
-  logPath = value
+  // Separate files: the launcher's own activity log and the server's output
+  // log. The server redirects to the latter (holding it open), so keeping
+  // them distinct avoids the launcher's writes being lost to file locks.
   consolePath = value
+  logPath = value.replace(/\.log$/, '-server.log')
   try {
     if (fs.existsSync(consolePath)) {
       const lines = fs.readFileSync(consolePath, 'utf8').split(/\r?\n/).filter((l) => l.length > 0)
