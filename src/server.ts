@@ -663,7 +663,7 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   const node = cfg.nodePath || 'node'
   dshState = 'ok'
   addActivity('✓ dsh detected (source run)')
-  addActivity('ℹ source 启动会用 tsx 即时转译 TypeScript，首次启动较慢，请耐心等待')
+  addActivity('ℹ Source mode compiles TypeScript on the fly with tsx — the first start is slower, please wait')
   addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts web --port ${cfg.port}`, true)
   const env = cfg.sourceDebug ? { NODE_DEBUG: 'module' } : undefined
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath, false, env)
@@ -1030,7 +1030,7 @@ export function clearConsole(): void {
       fs.writeFileSync(file, '')
     } catch {
       if (file === logPath) {
-        pushActivity('⚠ 服务端日志被占用(server 运行中),未能清空;先 Stop 再 Clear')
+        pushActivity('⚠ Server log is locked by the running server — Stop first, then Clear')
       }
     }
   }
