@@ -638,7 +638,9 @@ function spawnNpm(cfg: DshConfig): void {
   addActivity('✓ dsh detected (npx run)')
   addActivity(`▶ Start: ${NPX_RUN_COMMAND} --port ${cfg.port}`, true)
   // Windows: npx is a .cmd shim, so run it through the shell.
-  spawnServer('npx', ['-y', '@deepseek-ai/dsh', 'web', '--port', String(cfg.port)], undefined, process.platform === 'win32')
+  // `--loglevel=http` makes npm print each package fetch (with timing) so
+  // a long install is visible in the console instead of looking frozen.
+  spawnServer('npx', ['--loglevel', 'http', '-y', '@deepseek-ai/dsh', 'web', '--port', String(cfg.port)], undefined, process.platform === 'win32')
 }
 
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
