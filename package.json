@@ -93,8 +93,8 @@
         },
         "dsh.sourceDebug": {
           "type": "boolean",
-          "default": false,
-          "description": "In source mode, enable NODE_DEBUG=module to print module-loading progress (very verbose; off by default)."
+          "default": true,
+          "description": "In source mode, enable NODE_DEBUG=module to print module-loading progress (very verbose; the console shows a periodic count, full detail is in the server log)."
         }
       }
     }

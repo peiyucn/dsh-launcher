@@ -89,6 +89,7 @@ let logTailWatcher: fs.FSWatcher | undefined
 let logTailTimer: ReturnType<typeof setInterval> | undefined
 let logTailOffset = 0
 let logTailBuffer = ''
+let moduleLoadCount = 0
 let dshVersion = ''
 let dshSource: '' | 'npx' | 'source' = ''
 let dshPath = ''
@@ -105,7 +106,7 @@ export function readConfig(): DshConfig {
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
-    sourceDebug: c.get<boolean>('sourceDebug') ?? false,
+    sourceDebug: c.get<boolean>('sourceDebug') ?? true,
   }
 }
 
@@ -179,9 +180,16 @@ export function addActivity(line: string, isBusy = false): void {
 function displayLine(line: string): void {
   const trimmed = line.trimEnd()
   if (!trimmed) return
-  // NODE_DEBUG=module is extremely verbose; keep it out of the console feed
-  // (it stays in the server log file for debugging).
-  if (/^MODULE\s/.test(trimmed)) return
+  // NODE_DEBUG=module is extremely verbose; keep individual lines out of the
+  // console feed (they stay in the server log file), but surface a periodic
+  // count so a slow source startup still shows progress.
+  if (/^MODULE\s/.test(trimmed)) {
+    moduleLoadCount++
+    if (moduleLoadCount % 500 === 0) {
+      pushActivity(`[${new Date().toLocaleTimeString()}] ℹ Loading modules… (${moduleLoadCount})`)
+    }
+    return
+  }
   pushActivity(`[${new Date().toLocaleTimeString()}] ${trimmed}`)
 }
 
