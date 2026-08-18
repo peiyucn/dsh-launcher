@@ -17,7 +17,10 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["AI", "Other"],
+  "categories": [
+    "AI",
+    "Other"
+  ],
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -28,7 +31,9 @@
     "coding-agent",
     "web-ui"
   ],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -45,7 +50,8 @@
         {
           "type": "webview",
           "id": "dsh.panel",
-          "name": "Dashboard"
+          "name": "🐳DSH WebUI: Dashboard",
+          "icon": "resources/icon.svg"
         }
       ]
     },
@@ -61,13 +67,19 @@
       "properties": {
         "dsh.mode": {
           "type": "string",
-          "enum": ["npx", "source"],
+          "enum": [
+            "npx",
+            "source"
+          ],
           "default": "npx",
           "description": "How to run DeepSeek Harness: 'npx' runs 'npx @deepseek-ai/dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
         },
         "dsh.browser": {
           "type": "string",
-          "enum": ["built-in", "external"],
+          "enum": [
+            "built-in",
+            "external"
+          ],
           "default": "built-in",
           "description": "Which browser to open the UI in. 'built-in' uses VS Code's Simple Browser (falls back to external if disabled); 'external' opens the system browser."
         },
