@@ -466,7 +466,14 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         addActivity('↻ Re-checking requirements…')
         await this.refresh()
         await clearRequirementsCaches()
-        addActivity('✓ Requirements re-checked')
+        {
+          const st = await currentStatus()
+          const node = st.node === 'ok' ? 'v' + st.nodeVersion : 'missing'
+          const npm = st.npm === 'ok' ? 'v' + st.npmVersion : 'missing'
+          const dsh = st.dsh === 'ok' ? 'v' + st.dshVersion : st.dsh === 'missing' ? 'missing' : 'not installed'
+          const upd = st.update && st.update.hasUpdate ? ' · update → ' + st.update.label : ''
+          addActivity(`✓ Re-checked: Node ${node} · npm ${npm} · DSH ${dsh}${upd}`)
+        }
         break
       case 'setMode':
         if (message.value === 'npx' || message.value === 'source') {
