@@ -78,6 +78,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   button.secondary:hover { background: var(--vscode-toolbar-hoverBackground); }
   button.danger:hover { border-color: #f85149; color: #f85149; background: rgba(248,81,73,.1); }
   .console { height: 200px; margin: 0; padding: 8px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); font-size: 11px; }
+  .log-files { border-top: 1px solid var(--vscode-panel-border); margin-top: 6px; padding-top: 4px; display: flex; flex-direction: column; gap: 3px; }
   .console-header { display: flex; align-items: center; gap: 6px; }
   .console-title { font-weight: 600; font-size: 11px; }
   .console-size { color: var(--vscode-descriptionForeground); font-size: 10px; margin-left: auto; }
@@ -205,6 +206,16 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     <button class="mini-btn" id="clearConsoleBtn" title="Clear console log">Clear</button>
   </div>
   <pre class="console" id="log"></pre>
+  <div class="log-files">
+    <div class="runtime-row">
+      <span class="runtime-label">log</span>
+      <span class="runtime-path" id="launcherLogPath" data-log="1"></span>
+    </div>
+    <div class="runtime-row">
+      <span class="runtime-label">server</span>
+      <span class="runtime-path" id="serverLogPath" data-log="1"></span>
+    </div>
+  </div>
   <div class="footer">
     <button class="icon-btn" id="settingsBtn" title="Open extension settings">⚙ Settings</button>
     <div class="setting">
@@ -327,6 +338,20 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    function renderLogFiles(status) {
+      status = status || {}
+      const launcher = document.getElementById('launcherLogPath')
+      const server = document.getElementById('serverLogPath')
+      if (launcher) {
+        launcher.textContent = status.consoleLogPathShort || ''
+        launcher.title = status.consoleLogPath || ''
+      }
+      if (server) {
+        server.textContent = status.serverLogPathShort || ''
+        server.title = status.serverLogPath || ''
+      }
+    }
+
     function renderDs(ds) {
       ds = ds || {}
       const list = document.getElementById('dsComponents')
@@ -396,7 +421,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
           return
         }
         const full = el.getAttribute('title')
-        if (full) vscode.postMessage({ command: 'revealPath', value: full })
+        if (!full) return
+        if (el.dataset.log) vscode.postMessage({ command: 'openLog', value: full })
+        else vscode.postMessage({ command: 'revealPath', value: full })
       })
     })
 
@@ -489,6 +516,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (dsCard) dsCard.style.display = m.showDs === false ? 'none' : ''
       renderRunning(m.status)
       renderRequirements(m.status)
+      renderLogFiles(m.status)
       renderDs(m.dsStatus)
       renderBalance(m.balance)
       renderPricing()
@@ -543,6 +571,16 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         break
       case 'revealPath':
         if (message.value) void vscode.env.openExternal(vscode.Uri.file(message.value))
+        break
+      case 'openLog':
+        if (message.value) {
+          const uri = vscode.Uri.file(message.value)
+          try {
+            await vscode.window.showTextDocument(uri, { preview: true })
+          } catch {
+            void vscode.env.openExternal(uri)
+          }
+        }
         break
       case 'balance':
         addActivity('↻ Querying DeepSeek balance…', true)
@@ -618,6 +656,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         nodeVersion: '',
         mode: cfg.mode,
         update: undefined,
+        consoleLogPath: '',
+        consoleLogPathShort: '',
+        serverLogPath: '',
+        serverLogPathShort: '',
       }
       try {
         await this.view.webview.postMessage({

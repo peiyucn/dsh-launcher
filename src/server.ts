@@ -61,6 +61,11 @@ export interface ServerStatus {
   nodeVersion: string
   mode: 'npx' | 'source'
   update: DshUpdate | undefined
+  /** Launcher activity log + server stdout/stderr log (full and masked paths). */
+  consoleLogPath: string
+  consoleLogPathShort: string
+  serverLogPath: string
+  serverLogPathShort: string
 }
 
 export interface DshUpdate {
@@ -994,6 +999,10 @@ export async function currentStatus(): Promise<ServerStatus> {
     nodeVersion,
     mode: cfg.mode === 'source' ? 'source' : 'npx',
     update: updateCache?.update,
+    consoleLogPath: consolePath,
+    consoleLogPathShort: maskPath(consolePath),
+    serverLogPath: logPath,
+    serverLogPathShort: maskPath(logPath),
   }
 }
 
