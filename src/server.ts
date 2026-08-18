@@ -179,6 +179,9 @@ export function addActivity(line: string, isBusy = false): void {
 function displayLine(line: string): void {
   const trimmed = line.trimEnd()
   if (!trimmed) return
+  // NODE_DEBUG=module is extremely verbose; keep it out of the console feed
+  // (it stays in the server log file for debugging).
+  if (/^MODULE\s/.test(trimmed)) return
   pushActivity(`[${new Date().toLocaleTimeString()}] ${trimmed}`)
 }
 
