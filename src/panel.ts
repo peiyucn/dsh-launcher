@@ -177,11 +177,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       <span class="req-mark" id="req-node">·</span>
     </div>
     <div class="req-row">
-      <span class="req-name">npm</span>
-      <span class="req-value" id="npmVersion">—</span>
-      <span class="req-mark" id="req-npm">·</span>
-    </div>
-    <div class="req-row">
       <span class="req-name">DSH</span>
       <span class="req-value" id="dshVersion">—</span>
       <span class="req-mark" id="req-dsh">·</span>
@@ -317,10 +312,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     function renderRequirements(status) {
       status = status || {}
       document.getElementById('nodeVersion').textContent = status.nodeVersion || (status.node === 'missing' ? 'not found' : '—')
-      document.getElementById('npmVersion').textContent = status.npmVersion || (status.npm === 'missing' ? 'not found' : '—')
       document.getElementById('dshVersion').textContent = status.dshVersion ? ('v' + status.dshVersion) : (status.dsh === 'missing' ? 'not found' : '—')
       setMark('req-node', status.node)
-      setMark('req-npm', status.npm)
       setMark('req-dsh', status.dsh)
 
       const upd = status.update
@@ -523,10 +516,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         {
           const st = await currentStatus()
           const node = st.node === 'ok' ? 'v' + st.nodeVersion : 'missing'
-          const npm = st.npm === 'ok' ? 'v' + st.npmVersion : 'missing'
           const dsh = st.dsh === 'ok' ? 'v' + st.dshVersion : st.dsh === 'missing' ? 'missing' : 'not installed'
           const upd = st.update && st.update.hasUpdate ? ' · update → ' + st.update.label : ''
-          addActivity(`✓ Re-checked: Node ${node} · npm ${npm} · DSH ${dsh}${upd}`)
+          addActivity(`✓ Re-checked: Node ${node} · DSH ${dsh}${upd}`)
         }
         finishBusy()
         break
@@ -616,7 +608,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         starting: false,
         url: '',
         node: 'unknown',
-        npm: 'unknown',
         dsh: 'unknown',
         dshVersion: '',
         dshSource: '',
@@ -625,7 +616,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         dshPathShort: '',
         dshHomeShort: '',
         nodeVersion: '',
-        npmVersion: '',
         mode: cfg.mode,
         update: undefined,
       }

@@ -51,7 +51,6 @@ export interface ServerStatus {
   starting: boolean
   url: string
   node: ConditionState
-  npm: ConditionState
   dsh: ConditionState
   dshVersion: string
   dshSource: string
@@ -60,7 +59,6 @@ export interface ServerStatus {
   dshPathShort: string
   dshHomeShort: string
   nodeVersion: string
-  npmVersion: string
   mode: 'npx' | 'source'
   update: DshUpdate | undefined
 }
@@ -94,8 +92,6 @@ let dshVersion = ''
 let dshSource: '' | 'npx' | 'source' = ''
 let dshPath = ''
 let nodeVersion = ''
-let npmState: ConditionState = 'unknown'
-let npmVersion = ''
 
 export function readConfig(): DshConfig {
   // Read the persisted settings every time: dsh.mode is the single source
@@ -282,16 +278,6 @@ async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string
   const major = Number(match[1])
   const minor = Number(match[2])
   return { ok: major >= 24 || (major === 22 && minor >= 19), version }
-}
-
-/** Whether npm is available (npx mode needs it) and its version. */
-async function checkNpm(): Promise<{ ok: boolean; version: string }> {
-  // npm is a .cmd shim on Windows, so run it through cmd there.
-  const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', 'npm', '--version'], 8_000)
-    : await runFile('npm', ['--version'], 8_000)
-  const version = result.ok ? result.stdout.trim() : ''
-  return { ok: result.ok, version }
 }
 
 /** Read the newest @deepseek-ai/dsh version cached under the npx cache. */
@@ -962,7 +948,7 @@ export async function runDshUpdate(): Promise<void> {
   if (ok) updateCache = undefined
 }
 
-let detectionCache: { node: ConditionState; npm: ConditionState; dsh: DshDetection; at: number } | undefined
+let detectionCache: { node: ConditionState; dsh: DshDetection; at: number } | undefined
 let updateCache: { update: DshUpdate; at: number } | undefined
 
 export async function currentStatus(): Promise<ServerStatus> {
@@ -977,15 +963,13 @@ export async function currentStatus(): Promise<ServerStatus> {
   // Periodically probe node/dsh so the panel reflects reality without a start.
   const now = Date.now()
   if (!detectionCache || now - detectionCache.at > DETECTION_CACHE_TTL_MS) {
-    const [nodeCheck, npmCheck, dshDet] = await Promise.all([checkNode(cfg), checkNpm(), detectDsh(cfg)])
+    const [nodeCheck, dshDet] = await Promise.all([checkNode(cfg), detectDsh(cfg)])
     nodeState = nodeCheck.ok ? 'ok' : 'missing'
     nodeVersion = nodeCheck.version
-    npmState = npmCheck.ok ? 'ok' : 'missing'
-    npmVersion = npmCheck.version
     dshState = dshDet.state
     dshSource = dshDet.source
     dshPath = dshDet.path
-    detectionCache = { node: nodeState, npm: npmState, dsh: dshDet, at: now }
+    detectionCache = { node: nodeState, dsh: dshDet, at: now }
     detectDshVersion(cfg)
   }
 
@@ -1000,7 +984,6 @@ export async function currentStatus(): Promise<ServerStatus> {
     starting,
     url: uiUrl(cfg),
     node: nodeState,
-    npm: npmState,
     dsh: dshState,
     dshVersion,
     dshSource,
@@ -1009,7 +992,6 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshPathShort: maskPath(dshPath),
     dshHomeShort: maskPath(dshHome),
     nodeVersion,
-    npmVersion,
     mode: cfg.mode === 'source' ? 'source' : 'npx',
     update: updateCache?.update,
   }
