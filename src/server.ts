@@ -627,6 +627,7 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   const node = cfg.nodePath || 'node'
   dshState = 'ok'
   addActivity('✓ dsh detected (source run)')
+  addActivity('ℹ source 启动会用 tsx 即时转译 TypeScript，首次启动较慢，请耐心等待')
   addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts web --port ${cfg.port}`, true)
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath)
 }
