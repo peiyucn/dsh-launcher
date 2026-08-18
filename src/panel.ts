@@ -88,7 +88,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .icon-btn { background: transparent; border: none; border-radius: 4px; color: var(--vscode-foreground); cursor: pointer; padding: 2px 4px; font-size: 12px; flex: none; }
   .icon-btn:hover { color: var(--vscode-textLink-foreground); }
   .icon-btn.spinning { animation: spin 1s linear infinite; }
-  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  .spin { display: inline-block; width: 1em; text-align: center; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .loading-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--vscode-editor-background); z-index: 10; transition: opacity .2s ease; }
   .loading-overlay.hidden { opacity: 0; pointer-events: none; }
@@ -415,6 +415,19 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     function stopElapsed() {
       if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = undefined }
     }
+    const SPIN_CHARS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    let spinIdx = 0
+    let spinTimer = undefined
+    function startSpin() {
+      if (spinTimer) return
+      spinTimer = setInterval(() => {
+        const c = SPIN_CHARS[spinIdx++ % SPIN_CHARS.length]
+        document.querySelectorAll('.spin').forEach((el) => { el.textContent = c })
+      }, 150)
+    }
+    function stopSpin() {
+      if (spinTimer) { clearInterval(spinTimer); spinTimer = undefined }
+    }
     function startElapsed() {
       if (elapsedTimer) return false
       since = Date.now()
@@ -446,7 +459,12 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const hasNew = log.dataset.activity !== activity
       log.dataset.activity = activity
       let logHtml = esc(activity)
-      if (m.status && m.status.starting) logHtml = logHtml.replace(/▶/g, '<span class="spin">▶</span>')
+      if (m.status && m.status.starting) {
+        logHtml = logHtml.replace(/▶/g, '<span class="spin">⠋</span>')
+        startSpin()
+      } else {
+        stopSpin()
+      }
       log.innerHTML = logHtml
       if (hasNew) log.scrollTop = log.scrollHeight
       const dsCard = document.getElementById('dsCard')
