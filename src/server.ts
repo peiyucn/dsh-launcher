@@ -986,11 +986,12 @@ export async function clearRequirementsCaches(): Promise<void> {
 /** Clear the console log (in-memory feed and the persisted file). */
 export function clearConsole(): void {
   activity.length = 0
-  if (consolePath) {
+  for (const file of [consolePath, logPath]) {
+    if (!file) continue
     try {
-      fs.writeFileSync(consolePath, '')
+      fs.writeFileSync(file, '')
     } catch {
-      // best effort
+      // best effort (the server may hold its log open)
     }
   }
 }
