@@ -106,6 +106,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .ds-title { font-weight: 600; }
   .ds-open { background: transparent; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; padding: 0; font-size: 11px; flex: none; text-decoration: none; margin-left: auto; }
   .ds-open:hover { text-decoration: underline; }
+  .ds-pricing { flex: none; font-size: 10px; padding: 0 5px; border-radius: 4px; line-height: 16px; }
+  .ds-pricing.peak { color: #f85149; background: rgba(248,81,73,.12); }
+  .ds-pricing.offpeak { color: #2ea043; background: rgba(46,160,67,.12); }
   .ds-components { display: flex; flex-direction: column; gap: 4px; }
   .ds-comp { display: flex; align-items: center; gap: 6px; font-size: 11px; }
   .ds-comp-name { flex: 1; min-width: 0; color: var(--vscode-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -191,6 +194,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   <div class="card" id="dsCard">
     <div class="ds-header">
       <span class="ds-title">DeepSeek API Status</span>
+      <span class="ds-pricing" id="dsPricing" title=""></span>
       <button class="ds-open" id="dsOpenBtn" title="status.deepseek.com (official DeepSeek status)">↗</button>
     </div>
     <div class="ds-components" id="dsComponents"></div>
@@ -357,6 +361,20 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    function renderPricing() {
+      const el = document.getElementById('dsPricing')
+      const now = new Date()
+      const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes()
+      const peak = (utcMin >= 60 && utcMin < 240) || (utcMin >= 360 && utcMin < 600)
+      el.textContent = peak ? 'Peak' : 'Off-peak'
+      el.className = 'ds-pricing ' + (peak ? 'peak' : 'offpeak')
+      const local = (h) => {
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, 0))
+        return String(d.getHours()).padStart(2, '0') + ':00'
+      }
+      el.title = 'Peak: 01:00–04:00, 06:00–10:00 UTC (your time ' + local(1) + '–' + local(4) + ', ' + local(6) + '–' + local(10) + '); off-peak is half the peak rate'
+    }
+
     document.querySelectorAll('button[data-cmd]').forEach((b) => {
       b.addEventListener('click', () => {
         // Gray the Start button instantly; the next status update re-enables it.
@@ -480,6 +498,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       renderRequirements(m.status)
       renderDs(m.dsStatus)
       renderBalance(m.balance)
+      renderPricing()
     })
   </script>
 </body>
