@@ -15,8 +15,6 @@ export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
 export const PORT_PROBE_TIMEOUT_MS = 500
 export const PORT_PROBE_FAST_MS = 400
 export const PORT_POLL_INTERVAL_MS = 500
-/** How often to nudge the user while the server is still starting (ms). */
-export const START_HINT_MS = 60_000
 export const STOP_POLL_INTERVAL_MS = 200
 export const STOP_POLL_ATTEMPTS = 10
 export const STOP_POLL_PROBE_MS = 300

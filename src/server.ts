@@ -13,7 +13,6 @@ import {
   PORT_PROBE_FAST_MS,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
-  START_HINT_MS,
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
@@ -646,7 +645,6 @@ function spawnNpm(cfg: DshConfig): void {
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
 async function waitForPort(cfg: DshConfig): Promise<boolean> {
   const startedAt = Date.now()
-  let lastHintAt = 0
   // No hard timeout: the first start of a new dsh version installs many
   // packages and can take several minutes. The fail-fast below still reports
   // a dead spawn, and Stop stays available from the panel.
@@ -666,11 +664,6 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
       addActivity('✗ Server exited before opening the port (see the log above)')
       finishBusy()
       return false
-    }
-    const elapsed = Date.now() - startedAt
-    if (elapsed >= START_HINT_MS && elapsed - lastHintAt >= 60_000) {
-      lastHintAt = elapsed
-      addActivity(`ℹ Still starting after ${Math.round(elapsed / 1000)}s — first start of a new dsh version can take a while; please wait`)
     }
   }
 }
