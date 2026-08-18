@@ -10,7 +10,6 @@ import {
   DSH_CLI_BIN,
   LOG_RELOAD_LINES,
   NPX_RUN_COMMAND,
-  PORT_PROBE_FAST_MS,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
   STOP_POLL_ATTEMPTS,
@@ -247,6 +246,19 @@ function isPortOpen(host: string, port: number, timeoutMs = PORT_PROBE_TIMEOUT_M
       finish(false)
     }
   })
+}
+
+/** Whether the web server is serving (an HTTP request succeeds), not just bound. */
+async function isHttpReady(host: string, port: number, timeoutMs: number): Promise<boolean> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const res = await fetch(`http://${host}:${port}/`, { signal: controller.signal })
+    clearTimeout(timer)
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 /** Whether Node.js is present and satisfies the harness engines range (^22.19 || >=24). */
@@ -660,7 +672,9 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
   // a dead spawn, and Stop stays available from the panel.
   while (true) {
     await sleep(PORT_POLL_INTERVAL_MS)
-    if (await isPortOpen(LOOPBACK_HOST, cfg.port, PORT_PROBE_FAST_MS)) {
+    // The port binds before the web app finishes booting; wait for an HTTP
+    // response so the browser doesn't open onto a blank page.
+    if (await isHttpReady(LOOPBACK_HOST, cfg.port, 2_000)) {
       starting = false
       const secs = Math.round((Date.now() - startedAt) / 1000)
       const dur = secs >= 60 ? `${Math.floor(secs / 60)}m${secs % 60}s` : `${secs}s`
