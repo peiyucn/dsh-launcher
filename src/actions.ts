@@ -19,6 +19,8 @@ export async function openUrl(url: string): Promise<void> {
 // Re-entrancy guard for the start action. (Distinct from server.ts's
 // `starting` status flag, which reflects the spawn/poll lifecycle.)
 let startInFlight = false
+let lastOpenAt = 0
+const OPEN_DEBOUNCE_MS = 2_000
 
 /** Start (or reuse) the server, then open the browser. */
 export async function actionStart(): Promise<void> {
@@ -30,6 +32,11 @@ export async function actionStart(): Promise<void> {
     // and console, so start silently and let the panel report progress.
     const ok = await ensureRunning(cfg)
     if (!ok) return
+    // Debounce browser opens so rapid clicks on the status bar (or the panel
+    // Start button while running) don't spawn one tab per click.
+    const now = Date.now()
+    if (now - lastOpenAt < OPEN_DEBOUNCE_MS) return
+    lastOpenAt = now
     // Always (re)open the browser — DSH is fine with multiple pages, and this
     // way a closed tab can always be reopened by clicking again.
     await openUrl(uiUrl())

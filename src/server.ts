@@ -8,7 +8,11 @@ import {
   ACTIVITY_MAX_LINES,
   DETECTION_CACHE_TTL_MS,
   DSH_CLI_BIN,
+  HTTP_PROBE_TIMEOUT_MS,
   LOG_RELOAD_LINES,
+  LOG_TAIL_POLL_MS,
+  MODULE_PROGRESS_EVERY,
+  NODE_PROBE_TIMEOUT_MS,
   NPX_RUN_COMMAND,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
@@ -82,6 +86,8 @@ let trackedPid: number | undefined
 let logPath = ''
 let consolePath = ''
 let busy: Promise<boolean> | undefined
+/** Set when the user presses Stop mid-start so waitForPort bails out. */
+let stopRequested = false
 /** One line in the panel activity feed; `busy` marks an in-progress operation. */
 interface ActivityEntry {
   text: string
@@ -136,11 +142,11 @@ export function uiUrl(cfg: DshConfig = readConfig()): string {
 }
 
 export function setLogPath(value: string): void {
-  // Separate files: the launcher's own activity log and the server's output
-  // log. The server redirects to the latter (holding it open), so keeping
-  // them distinct avoids the launcher's writes being lost to file locks.
+  // Both logs live in one folder (client.log = launcher activity, server.log
+  // = server output). The server redirects to the latter (holding it open),
+  // so keeping them distinct avoids the launcher's writes being lost to locks.
   consolePath = value
-  logPath = value.replace(/\.log$/, '-server.log')
+  logPath = path.join(path.dirname(value), 'server.log')
   try {
     if (fs.existsSync(consolePath)) {
       const lines = fs.readFileSync(consolePath, 'utf8').split(/\r?\n/).filter((l) => l.length > 0)
@@ -158,6 +164,7 @@ export function setLogPath(value: string): void {
 function appendLog(entry: string): void {
   if (!consolePath) return
   try {
+    fs.mkdirSync(path.dirname(consolePath), { recursive: true })
     fs.appendFileSync(consolePath, entry + '\n')
   } catch {
     // best effort
@@ -190,7 +197,7 @@ function displayLine(line: string): void {
   // count so a slow source startup still shows progress.
   if (/^MODULE\s/.test(trimmed)) {
     moduleLoadCount++
-    if (moduleLoadCount % 500 === 0) {
+    if (moduleLoadCount % MODULE_PROGRESS_EVERY === 0) {
       pushActivity(`[${new Date().toLocaleTimeString()}] ℹ Loading modules… (${moduleLoadCount})`)
     }
     return
@@ -266,20 +273,21 @@ function isPortOpen(host: string, port: number, timeoutMs = PORT_PROBE_TIMEOUT_M
 
 /** Whether the web server is serving (an HTTP request succeeds), not just bound. */
 async function isHttpReady(host: string, port: number, timeoutMs: number): Promise<boolean> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
     const res = await fetch(`http://${host}:${port}/`, { signal: controller.signal })
-    clearTimeout(timer)
     return res.ok
   } catch {
     return false
+  } finally {
+    clearTimeout(timer)
   }
 }
 
 /** Whether Node.js is present and satisfies the harness engines range (^22.19 || >=24). */
 async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string }> {
-  const result = await runFile(cfg.nodePath || 'node', ['--version'])
+  const result = await runFile(cfg.nodePath || 'node', ['--version'], NODE_PROBE_TIMEOUT_MS)
   const version = result.ok ? result.stdout.trim().replace(/^v/, '') : ''
   if (!result.ok) return { ok: false, version: '' }
   const match = /^v?(\d+)\.(\d+)/.exec(result.stdout.trim())
@@ -397,7 +405,7 @@ async function pickRepoFolder(): Promise<string | undefined> {
   return dir
 }
 
-/** Detect the local dsh version: a source checkout (source mode), else the installed package. */
+/** Detect the local dsh version: a source checkout (source mode), else the npx cache. */
 function detectDshVersion(cfg: DshConfig): void {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
@@ -408,31 +416,14 @@ function detectDshVersion(cfg: DshConfig): void {
     }
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'apps', 'cli', 'package.json'), 'utf8'))
-      if (pkg?.version) {
-        dshVersion = pkg.version
-        return
-      }
+      dshVersion = pkg?.version ?? ''
     } catch {
-      // fall through to installed package
+      dshVersion = ''
     }
-  }
-  // npx mode: only the npx cache counts (npx reinstalls from the registry on demand).
-  if (cfg.mode === 'npx') {
-    dshVersion = npxCachedDshVersion() ?? ''
     return
   }
-  try {
-    const link = path.join(resolveDshHome(), 'profiles', 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
-    const pkg = JSON.parse(fs.readFileSync(link, 'utf8'))
-    if (pkg?.version) {
-      dshVersion = pkg.version
-      return
-    }
-  } catch {
-    // leave empty
-  }
-  // Nothing readable anywhere: clear the value instead of showing a stale one.
-  dshVersion = ''
+  // npx mode: only the npx cache counts (npx reinstalls from the registry on demand).
+  dshVersion = npxCachedDshVersion() ?? ''
 }
 
 interface DshDetection {
@@ -522,7 +513,7 @@ function startLogTail(): void {
   logTailWatcher = fs.watch(logPath, () => pump())
   logTailWatcher.on('error', () => {})
   // fs.watch can miss appends on Windows; poll as a reliable fallback.
-  logTailTimer = setInterval(() => pump(), 500)
+  logTailTimer = setInterval(() => pump(), LOG_TAIL_POLL_MS)
 }
 
 function stopLogTail(): void {
@@ -605,6 +596,8 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
 function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell = false, env?: Record<string, string>): void {
   trackedPid = undefined
   starting = true
+  moduleLoadCount = 0
+  stopRequested = false
   fs.mkdirSync(path.dirname(logPath), { recursive: true })
   // Each start gets a fresh server log (dsh.clearServerLogOnStart, default on)
   // — otherwise output from every previous run accumulates (NODE_DEBUG=module
@@ -634,6 +627,9 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
   })
   child.unref()
   trackedChild = child
+  // Mirror the hidden-console path so waitForPort's fail-fast (which checks
+  // trackedPid) also covers a directly-spawned child that exits immediately.
+  trackedPid = child.pid
 
   let outBuffer = ''
   child.stdout?.on('data', (chunk: Buffer) => {
@@ -688,9 +684,16 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
   // a dead spawn, and Stop stays available from the panel.
   while (true) {
     await sleep(PORT_POLL_INTERVAL_MS)
+    // The user pressed Stop while starting: bail out quietly (Stop already
+    // reported its own outcome).
+    if (stopRequested) {
+      starting = false
+      finishBusy()
+      return false
+    }
     // The port binds before the web app finishes booting; wait for an HTTP
     // response so the browser doesn't open onto a blank page.
-    if (await isHttpReady(LOOPBACK_HOST, cfg.port, 2_000)) {
+    if (await isHttpReady(LOOPBACK_HOST, cfg.port, HTTP_PROBE_TIMEOUT_MS)) {
       starting = false
       const secs = Math.round((Date.now() - startedAt) / 1000)
       const dur = secs >= 60 ? `${Math.floor(secs / 60)}m${secs % 60}s` : `${secs}s`
@@ -709,8 +712,8 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
 }
 
 /**
- * Serialize server lifecycle operations so rapid clicks can't start two
- * servers or interleave stop/start.
+ * Coalesce concurrent start calls onto one in-flight run. (Stop deliberately
+ * bypasses this so it can interrupt a start; see stopServer.)
  */
 function exclusive(task: () => Promise<boolean>): Promise<boolean> {
   if (busy) return busy
@@ -860,6 +863,12 @@ async function findPortOwner(port: number): Promise<number | undefined> {
 }
 
 function killPid(pid: number): void {
+  if (process.platform === 'win32') {
+    // Kill the process tree: trackedPid is cmd.exe, and the node child that
+    // `cmd /c` blocks on would otherwise survive and finish starting.
+    execFile('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true }, () => {})
+    return
+  }
   try {
     process.kill(pid)
   } catch {
@@ -905,14 +914,19 @@ async function stopServerUnlocked(): Promise<boolean> {
   return !stillOpen
 }
 
-export function stopServer(): Promise<boolean> {
-  return exclusive(stopServerUnlocked)
-}
+let stopInFlight: Promise<boolean> | undefined
 
-/** Whether the dsh server port is open (fast probe). */
-export async function isServerRunning(): Promise<boolean> {
-  const cfg = readConfig()
-  return isPortOpen(LOOPBACK_HOST, cfg.port)
+export function stopServer(): Promise<boolean> {
+  // Stop must be able to interrupt an in-flight start, so it does not go
+  // through exclusive() (which would return the pending start promise and
+  // skip stopping). The flag makes the concurrent waitForPort bail out.
+  // Rapid repeat clicks coalesce onto the one in-flight stop.
+  if (stopInFlight) return stopInFlight
+  stopRequested = true
+  stopInFlight = stopServerUnlocked().finally(() => {
+    stopInFlight = undefined
+  })
+  return stopInFlight
 }
 
 /** Check for a newer dsh version (source mode only: git commits ahead of upstream). */
@@ -1027,8 +1041,11 @@ export function clearConsole(): void {
   for (const file of [consolePath, logPath]) {
     if (!file) continue
     try {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
       fs.writeFileSync(file, '')
     } catch {
+      // Only a real lock (EBUSY/EPERM from the running server) is worth
+      // telling the user about; a missing folder is handled by the mkdir above.
       if (file === logPath) {
         pushActivity('⚠ Server log is locked by the running server — Stop first, then Clear')
       }

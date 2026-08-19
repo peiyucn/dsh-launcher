@@ -5,8 +5,11 @@ import { actionStart } from './actions'
 import { DshPanelProvider } from './panel'
 import { currentStatus, dbg, registerConfigWatcher, setLogPath } from './server'
 
+const STATUS_REFRESH_INTERVAL_MS = 4_000
+const STATUS_SPIN_INTERVAL_MS = 150
+
 export function activate(context: vscode.ExtensionContext): void {
-  setLogPath(path.join(os.tmpdir(), 'dsh-launcher-panel.log'))
+  setLogPath(path.join(os.tmpdir(), 'dsh-launcher-panel', 'client.log'))
   dbg('activated')
 
   const panelProvider = new DshPanelProvider(context.extension.packageJSON.version ?? '0.0.0')
@@ -46,7 +49,7 @@ export function activate(context: vscode.ExtensionContext): void {
         statusBar.text = '🐳\uFE0E DSH ⠋'
         spinnerTimer = setInterval(() => {
           statusBar.text = `🐳\uFE0E DSH ${SPIN_CHARS[i++ % SPIN_CHARS.length]}`
-        }, 150)
+        }, STATUS_SPIN_INTERVAL_MS)
       }
     } else {
       stopSpinner()
@@ -56,8 +59,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  void refreshStatusBar()
-  const statusTimer = setInterval(() => void refreshStatusBar(), 4000)
+  void refreshStatusBar().catch(() => {})
+  const statusTimer = setInterval(() => void refreshStatusBar().catch(() => {}), STATUS_REFRESH_INTERVAL_MS)
 
   context.subscriptions.push(
     statusBar,

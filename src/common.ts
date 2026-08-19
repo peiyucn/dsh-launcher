@@ -13,12 +13,15 @@ export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
 // --- Timing (ms) ---
 
 export const PORT_PROBE_TIMEOUT_MS = 500
-export const PORT_PROBE_FAST_MS = 400
 export const PORT_POLL_INTERVAL_MS = 500
 export const STOP_POLL_INTERVAL_MS = 200
 export const STOP_POLL_ATTEMPTS = 10
 export const STOP_POLL_PROBE_MS = 300
 export const DETECTION_CACHE_TTL_MS = 8_000
+export const HTTP_PROBE_TIMEOUT_MS = 2_000
+export const NODE_PROBE_TIMEOUT_MS = 8_000
+export const MODULE_PROGRESS_EVERY = 500
+export const LOG_TAIL_POLL_MS = 500
 
 // --- Limits ---
 

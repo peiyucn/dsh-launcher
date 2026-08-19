@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, isServerRunning, readConfig, runDshUpdate, type ServerStatus } from './server'
+import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, readConfig, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -8,6 +8,8 @@ function getNonce(): string {
   for (let i = 0; i < 32; i++) out += chars.charAt(Math.floor(Math.random() * chars.length))
   return out
 }
+
+const REFRESH_INTERVAL_MS = 4_000
 
 export class DshPanelProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'dsh.panel'
@@ -235,6 +237,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi()
     vscode.postMessage({ command: 'ready' })
+    const LOADING_TIMEOUT_MS = 6000
+    const REFRESH_HINT_MS = 2000
+    const SPIN_INTERVAL_MS = 150
+    const ELAPSED_INTERVAL_MS = 1000
     let gotUpdate = false
     setTimeout(() => {
       if (!gotUpdate) {
@@ -242,7 +248,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         if (st && st.textContent === 'Checking…') st.textContent = '⚠ No status updates received'
       }
       document.getElementById('loadingOverlay').classList.add('hidden')
-    }, 6000)
+    }, LOADING_TIMEOUT_MS)
 
     function esc(s) {
       return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -272,7 +278,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       status = status || {}
       const running = !!(status.running)
       const starting = !!(status.starting)
-      document.querySelectorAll('.when-running').forEach((b) => { b.style.display = running ? '' : 'none' })
+      // Stop must be reachable while starting too, so a slow start can be
+      // interrupted (server.ts bails out of waitForPort when it sees the stop).
+      document.querySelectorAll('.when-running').forEach((b) => { b.style.display = (running || starting) ? '' : 'none' })
       const dot = document.getElementById('dot')
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
@@ -455,9 +463,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const el = document.getElementById('refreshHint')
       el.textContent = text
       if (refreshHintTimer) clearTimeout(refreshHintTimer)
-      if (!persistent) refreshHintTimer = setTimeout(() => { el.textContent = '' }, 2000)
+      if (!persistent) refreshHintTimer = setTimeout(() => { el.textContent = '' }, REFRESH_HINT_MS)
     }
     document.getElementById('refreshBtn').addEventListener('click', () => {
+      if (refreshingReqs) return
       refreshingReqs = true
       document.getElementById('refreshBtn').classList.add('spinning')
       vscode.postMessage({ command: 'refreshRequirements' })
@@ -483,7 +492,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       spinTimer = setInterval(() => {
         const c = SPIN_CHARS[spinIdx++ % SPIN_CHARS.length]
         document.querySelectorAll('.spin').forEach((el) => { el.textContent = c })
-      }, 150)
+      }, SPIN_INTERVAL_MS)
     }
     function stopSpin() {
       if (spinTimer) { clearInterval(spinTimer); spinTimer = undefined }
@@ -494,7 +503,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       elapsedTimer = setInterval(() => {
         const e = document.getElementById('statusSub')
         if (e) e.textContent = 'Waited ' + Math.round((Date.now() - since) / 1000) + 's'
-      }, 1000)
+      }, ELAPSED_INTERVAL_MS)
       return true
     }
 
@@ -503,8 +512,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (!m || m.type !== 'update') return
       gotUpdate = true
       document.getElementById('loadingOverlay').classList.add('hidden')
-      const wasRefreshing = refreshingReqs
-      const wasBalancing = refreshingBalance
       if (refreshingReqs) {
         refreshingReqs = false
         document.getElementById('refreshBtn').classList.remove('spinning')
@@ -574,8 +581,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         break
       case 'setMode':
         if (message.value === 'npx' || message.value === 'source') {
-          const wasRunning = await isServerRunning()
-          if (wasRunning) {
+          const st = await currentStatus()
+          if (st.running) {
             // Confirm before switching so that cancelling keeps the current mode.
             const pick = await vscode.window.showInformationMessage(
               `DeepSeek Harness is running — restart with ${message.value} mode?`,
@@ -587,6 +594,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
             await actionStop()
             await actionStart()
           } else {
+            // A start may be in flight with the old mode: interrupt it so the
+            // new mode takes effect on the next Start.
+            if (st.starting) await actionStop()
             await applyMode(message.value)
           }
         }
@@ -641,7 +651,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
 
   private startTimer(): void {
     this.stopTimer()
-    this.timer = setInterval(() => void this.refresh(), 4000)
+    this.timer = setInterval(() => void this.refresh(), REFRESH_INTERVAL_MS)
   }
 
   private stopTimer(): void {
