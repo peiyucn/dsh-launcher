@@ -21,13 +21,13 @@
 
 * **启动 / 停止** — 通过 `npx` 运行 dsh，并在就绪后打开 Web UI。
 * **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为 deepseek-harness 的 git clone 目录。刚 clone 下来也能直接用——首次启动时会提示自动执行 `pnpm install` + 构建。
-* **仪表盘面板** — 服务状态、实时控制台、DeepSeek 官方 API 状态以及你的账户余额。
+* **仪表盘面板** — 服务状态、实时控制台（含可点击的日志文件）、带峰谷时段标志的 DeepSeek 官方 API 状态以及你的账户余额。
 * **DSH 更新** — 仅源码运行：点击刷新按钮（⟳）检查新版本；有更新时会出现带新版本号的 Update 按钮，点击即可拉取更新。
 * **浏览器选择** — 内置浏览器或系统浏览器。
 
 ## 使用方法
 
-点击活动栏中的 DSH Launcher Panel 小鲸鱼图标，然后点击 **Start**。
+点击活动栏中的 🐳DSH WebUI 小鲸鱼图标，然后点击 **Start**。
 
 ## 设置
 
@@ -35,7 +35,8 @@
 
 | 键               | 默认值       | 说明                                                          |
 | --------------- | --------- | ----------------------------------------------------------- |
-| dsh.browser     | built-in  | built-in 或 external                                         |
+| dsh.mode        | npx       | `npx` 运行 `npx @deepseek-ai/dsh web`；`source` 通过 tsx 运行本地检出         |
+| dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器；`external` 打开系统浏览器                 |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
 | dsh.path        | 空         | source 模式的 deepseek-harness 检出路径（首次启动会提示自动构建）                  |
 | dsh.nodePath    | 空         | node.exe 路径；留空则使用 PATH 上的 node                              |
@@ -48,7 +49,7 @@
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。
-* 日志文件：`%TEMP%\dsh-launcher-panel.log`
+* 日志文件：`%TEMP%\dsh-launcher-panel\client.log`（启动器活动）与 `%TEMP%\dsh-launcher-panel\server.log`（服务端输出），面板中均可点击打开。
 * DSH在Windows下暂无法正常运行“极简模式”。
 
 ## 环境

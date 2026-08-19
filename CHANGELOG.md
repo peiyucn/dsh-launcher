@@ -4,9 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.4] - 2026-08-18
 
-- Fixed: the balance query now parses `.credentials.yaml` in flow style (`{ KEY: value }`) as well as block style, so it no longer reports "no key" after model settings are re-saved.
-- Added npm to the Requirements card (version + availability), with a bounded probe so a hung npm can't freeze the panel.
-- Start no longer gives up after a fixed timeout: it waits indefinitely, and when npx installs a new/first dsh version the console announces the version number and warns that the first start takes longer.
+- Dashboard: both log files (launcher activity + server output) now appear as masked, clickable paths with their sizes, and the Clear button clears both.
+- Added a `debug on/off` pill next to the Console title (source mode only) that toggles `dsh.sourceDebug` (`NODE_DEBUG=module`); module-loading noise is filtered out of the console and shown as a periodic count, with full detail kept in the server log.
+- Added `dsh.clearServerLogOnStart` (default on) so each launch starts with a fresh server log instead of accumulating across runs.
+- Requirements card now shows Node and DSH only (npm version removed — it always ships with Node).
+- DeepSeek API Status card shows a Peak / Off-peak pricing pill (computed in UTC; tooltip shows local times).
+- Start waits for the web server to actually serve a page before opening the browser, avoiding a blank tab, and reports how long it took once ready.
+- Network-unreachable installs fail fast with a clear message; npx uses `--loglevel=http` so downloads stream into the console.
+- Unified all spinners to the same braille dot-matrix style; activity entries are structured (busy flag) instead of string-matching icon characters.
+- Log files now live in `%TEMP%\dsh-launcher-panel\` as `client.log` (launcher activity) and `server.log` (server output), keeping the lock-prone server log separate and shortening the paths shown in the panel.
+- Panel title is now "🐳DSH WebUI: Dashboard".
+- Fixed: the balance query parses `.credentials.yaml` in flow style (`{ KEY: value }`) as well as block style, so it no longer reports "no key" after model settings are re-saved.
+- Fixed: Stop now interrupts an in-flight start (it was previously ignored while starting), and stopping kills the whole process tree on Windows so the server cannot restart on its own.
+- Added a unit test suite (`npm test`, Node's built-in test runner) covering the path-masking, credential-parsing and status-parsing helpers.
 
 ## [0.1.3] - 2026-08-17
 
