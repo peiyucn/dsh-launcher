@@ -95,7 +95,7 @@ async function fetchDsStatus(): Promise<DsStatus> {
   return { state: 'unknown', text: 'DeepSeek API status unknown', components: [], incidents: [], updatedAt: null }
 }
 
-function parseDsStatus(json: any): DsStatus {
+export function parseDsStatus(json: any): DsStatus {
   try {
     const page = json?.data?.page ?? {}
 
@@ -157,7 +157,7 @@ function parseDsStatus(json: any): DsStatus {
 }
 
 /** Read a credential from a flat name:value / name=value mapping (block or flow style). */
-function readCredentialFromFile(name: string, file: string): string | undefined {
+export function readCredentialFromFile(name: string, file: string): string | undefined {
   try {
     const text = fs.readFileSync(file, 'utf8')
     // Whole-file scan: matches KEY: value / KEY= value in both block style
@@ -189,7 +189,7 @@ function readCredential(name: string): string | undefined {
 }
 
 /** Read the default Agent model selection from settings.yaml. */
-function readDefaultModel(): { provider: string; model: string } | undefined {
+export function readDefaultModel(): { provider: string; model: string } | undefined {
   try {
     const lines = fs.readFileSync(path.join(resolveDshHome(), 'settings.yaml'), 'utf8').split(/\r?\n/)
     let section = ''

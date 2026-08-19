@@ -119,7 +119,9 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -w -p ./",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "tsc -p ./ && node --test",
+    "verify": "npm test && npm run package"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
