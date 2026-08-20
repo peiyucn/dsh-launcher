@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5]
+
+- dsh ≥ rc.8 passes `--no-open`, keeping the panel's `dsh.browser` choice as the only opener (rc.8 opens the system browser on its own).
+- Added `dsh.channel` (`latest` / `next`) so npx can follow the prerelease channel — rc.8 is published to `next`; set it to `next` to run rc.8 via npx.
+- Update checks report network failures in the console instead of silently showing "no update".
+
 ## [0.1.4] - 2026-08-18
 
 - Dashboard: both log files (launcher activity + server output) now appear as masked, clickable paths with their sizes, and the Clear button clears both.

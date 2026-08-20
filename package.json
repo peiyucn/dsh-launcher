@@ -2,7 +2,7 @@
   "name": "dsh-launcher-panel",
   "displayName": "DSH Launcher Panel",
   "description": "Start DeepSeek Harness (dsh) and open its web UI in VS Code's built-in browser.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "icon": "resources/icon.png",
   "publisher": "peiyucn",
   "license": "MIT",
@@ -73,6 +73,15 @@
           ],
           "default": "npx",
           "description": "How to run DeepSeek Harness: 'npx' runs 'npx @deepseek-ai/dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
+        },
+        "dsh.channel": {
+          "type": "string",
+          "enum": [
+            "latest",
+            "next"
+          ],
+          "default": "latest",
+          "description": "Which npm dist-tag npx resolves for @deepseek-ai/dsh: 'latest' (stable) or 'next' (prereleases; rc.8 is published to 'next', choose it to run rc.8 via npx)."
         },
         "dsh.browser": {
           "type": "string",

@@ -1,6 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isProcessAlive, maskPath, psQuote, quoteCmdArg, resolveDshHome, toEnglish } from '../out/common.js'
+import { dshVersionAtLeast, isProcessAlive, maskPath, psQuote, quoteCmdArg, resolveDshHome, toEnglish } from '../out/common.js'
+
+test('dshVersionAtLeast compares prerelease versions numerically', () => {
+  assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)
+  assert.equal(dshVersionAtLeast('0.1.0-rc.10', '0.1.0-rc.8'), true)
+  assert.equal(dshVersionAtLeast('0.1.0-rc.7', '0.1.0-rc.8'), false)
+  assert.equal(dshVersionAtLeast('', '0.1.0-rc.8'), false)
+  assert.equal(dshVersionAtLeast('0.2.0', '0.1.0-rc.8'), true)
+})
 
 test('maskPath abbreviates long Windows paths to drive + last segment', () => {
   assert.equal(maskPath('C:\\Users\\me\\dsh-launcher-panel.log'), 'C:\\…\\dsh-launcher-panel.log')

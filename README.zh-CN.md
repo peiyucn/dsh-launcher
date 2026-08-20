@@ -36,6 +36,7 @@
 | 键               | 默认值       | 说明                                                          |
 | --------------- | --------- | ----------------------------------------------------------- |
 | dsh.mode        | npx       | `npx` 运行 `npx @deepseek-ai/dsh web`；`source` 通过 tsx 运行本地检出         |
+| dsh.channel     | latest    | npx 解析的 npm dist-tag：`latest`（稳定）或 `next`（预发布；rc.8 在 `next` 上，选它才能跑 rc.8） |
 | dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器；`external` 打开系统浏览器                 |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
 | dsh.path        | 空         | source 模式的 deepseek-harness 检出路径（首次启动会提示自动构建）                  |

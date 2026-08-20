@@ -36,6 +36,7 @@ Settings → search "dsh":
 | Key | Default | Description |
 |---|---|---|
 | dsh.mode | npx | `npx` runs `npx @deepseek-ai/dsh web`; `source` runs a local checkout via tsx |
+| dsh.channel | latest | npm dist-tag npx resolves: `latest` (stable) or `next` (prereleases; rc.8 is on `next` — choose it to run rc.8) |
 | dsh.browser | built-in | `built-in` uses VS Code's Simple Browser; `external` opens the system browser |
 | dsh.hideConsole | true | Hide the server console window on Windows |
 | dsh.path | empty | Path to a deepseek-harness git clone for source mode (first start offers to build it) |

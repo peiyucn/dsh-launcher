@@ -4,11 +4,11 @@ import { execFile } from 'node:child_process'
 
 // --- dsh ---
 
-/** Official npx method: npx resolves from the registry on every run. */
-export const NPX_RUN_COMMAND = 'npx @deepseek-ai/dsh web'
-
 /** Marker path that identifies a deepseek-harness source checkout. */
 export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
+
+/** dsh ≥ this version opens the system browser on its own; the launcher then passes `--no-open`. */
+export const DSH_NO_OPEN_MIN_VERSION = '0.1.0-rc.8'
 
 // --- Timing (ms) ---
 
@@ -41,6 +41,27 @@ export function resolveDshHome(): string {
 }
 
 // --- Pure helpers ---
+
+/** Compare dsh versions like '0.1.0-rc.8' numerically (rc.10 > rc.9, rc.8 > rc.7). */
+export function dshVersionAtLeast(version: string, target: string): boolean {
+  const parts = (v: string): (number | string)[] => v.split(/[-.]/).map((p) => (/^\d+$/.test(p) ? Number(p) : p))
+  const a = parts(version)
+  const b = parts(target)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i]
+    const y = b[i]
+    if (x === undefined) return false
+    if (y === undefined) return true
+    if (typeof x === 'number' && typeof y === 'number') {
+      if (x !== y) return x > y
+    } else {
+      const sx = String(x)
+      const sy = String(y)
+      if (sx !== sy) return sx > sy
+    }
+  }
+  return true
+}
 
 /** Strip non-ASCII characters and trailing parentheticals to yield an English name. */
 export function toEnglish(text: string): string {
@@ -76,10 +97,10 @@ export function sleep(ms: number): Promise<void> {
 }
 
 /** Run a command without a shell (no cmd window flash on Windows); `timeoutMs` bounds a hung probe. */
-export function runFile(command: string, args: string[], timeoutMs = 0): Promise<{ ok: boolean; stdout: string }> {
+export function runFile(command: string, args: string[], timeoutMs = 0): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    execFile(command, args, { windowsHide: true, timeout: timeoutMs > 0 ? timeoutMs : undefined }, (error, stdout) => {
-      resolve({ ok: !error, stdout: stdout ?? '' })
+    execFile(command, args, { windowsHide: true, timeout: timeoutMs > 0 ? timeoutMs : undefined }, (error, stdout, stderr) => {
+      resolve({ ok: !error, stdout: stdout ?? '', stderr: stderr ?? '' })
     })
   })
 }

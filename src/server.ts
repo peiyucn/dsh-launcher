@@ -8,17 +8,18 @@ import {
   ACTIVITY_MAX_LINES,
   DETECTION_CACHE_TTL_MS,
   DSH_CLI_BIN,
+  DSH_NO_OPEN_MIN_VERSION,
   HTTP_PROBE_TIMEOUT_MS,
   LOG_RELOAD_LINES,
   LOG_TAIL_POLL_MS,
   MODULE_PROGRESS_EVERY,
   NODE_PROBE_TIMEOUT_MS,
-  NPX_RUN_COMMAND,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
+  dshVersionAtLeast,
   findOnPath,
   isProcessAlive,
   maskPath,
@@ -38,9 +39,13 @@ export type DshMode = 'npx' | 'source'
 /** dsh binds loopback only; the launcher probes and opens this fixed host. */
 const LOOPBACK_HOST = '127.0.0.1'
 
+export type DshChannel = 'latest' | 'next'
+
 /** Resolved extension settings (dsh.*). */
 export interface DshConfig {
   mode: DshMode
+  /** Which npm dist-tag npx resolves: 'latest' (default) or 'next' (prereleases). */
+  channel: DshChannel
   path: string
   nodePath: string
   port: number
@@ -114,6 +119,7 @@ export function readConfig(): DshConfig {
   const c = vscode.workspace.getConfiguration('dsh')
   return {
     mode: c.get<string>('mode') === 'source' ? 'source' : 'npx',
+    channel: c.get<string>('channel') === 'next' ? 'next' : 'latest',
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
     port: c.get<number>('port') ?? 3080,
@@ -321,22 +327,23 @@ function npxCachedDshVersion(): string | undefined {
   return best
 }
 
-/** Resolve the latest published @deepseek-ai/dsh version (undefined on failure). */
-async function latestDshVersion(): Promise<string | undefined> {
+/** Resolve the published @deepseek-ai/dsh version for a channel (undefined on failure). */
+async function latestDshVersion(channel: DshChannel): Promise<string | undefined> {
+  const spec = channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', 'npm', 'view', '@deepseek-ai/dsh', 'version'], 10_000)
-    : await runFile('npm', ['view', '@deepseek-ai/dsh', 'version'], 10_000)
+    ? await runFile('cmd', ['/c', 'npm', 'view', spec, 'version'], 10_000)
+    : await runFile('npm', ['view', spec, 'version'], 10_000)
   if (!result.ok) return undefined
   return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
 }
 
 /** Prepare the npx start: verify the registry when a download is required, and announce installs. Returns false to abort. */
-async function prepareNpxInstall(): Promise<boolean> {
+async function prepareNpxInstall(cfg: DshConfig): Promise<boolean> {
   const cached = npxCachedDshVersion()
   if (cached === undefined) {
     // Nothing cached: npx must download dsh, so verify the registry is
     // reachable first; a network outage should fail fast, not hang the start.
-    const latest = await latestDshVersion()
+    const latest = await latestDshVersion(cfg.channel)
     if (!latest) {
       dshState = 'missing'
       addActivity('✗ dsh is not installed and the npm registry is unreachable — check your network and try again')
@@ -348,7 +355,7 @@ async function prepareNpxInstall(): Promise<boolean> {
   }
   // Cached: optionally announce an upgrade (best-effort, non-blocking).
   void (async () => {
-    const latest = await latestDshVersion()
+    const latest = await latestDshVersion(cfg.channel)
     if (latest && latest !== cached) {
       addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — npx will update it before starting; this can take a while`)
     }
@@ -654,26 +661,41 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
   })
 }
 
+/**
+ * The `web` command tail: the port, plus `--no-open` when dsh ≥ rc.8 would
+ * open the system browser on its own. `knownNew` covers the npx `next`
+ * channel, where the cached version (rc.7) under-reports the version that
+ * will actually run (rc.8+) on a first install.
+ */
+function buildWebArgs(cfg: DshConfig, knownNew = false): string[] {
+  const args = ['web', '--port', String(cfg.port)]
+  if (knownNew || (dshVersion && dshVersionAtLeast(dshVersion, DSH_NO_OPEN_MIN_VERSION))) args.push('--no-open')
+  return args
+}
+
 /** Source mode: run a checkout via `node --import tsx/esm apps/cli/src/bin.ts web`. */
 function spawnSource(repoPath: string, cfg: DshConfig): void {
   const node = cfg.nodePath || 'node'
   dshState = 'ok'
   addActivity('✓ dsh detected (source run)')
   addActivity('ℹ Source mode compiles TypeScript on the fly with tsx — the first start is slower, please wait')
-  addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts web --port ${cfg.port}`, true)
+  const webArgs = buildWebArgs(cfg)
+  addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts ${webArgs.join(' ')}`, true)
   const env = cfg.sourceDebug ? { NODE_DEBUG: 'module' } : undefined
-  spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', 'web', '--port', String(cfg.port)], repoPath, false, env)
+  spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', ...webArgs], repoPath, false, env)
 }
 
-/** npx mode: run the official `npx @deepseek-ai/dsh web` command. */
+/** npx mode: run the official `npx @deepseek-ai/dsh web` command (per the chosen channel). */
 function spawnNpm(cfg: DshConfig): void {
   dshState = 'ok'
   addActivity('✓ dsh detected (npx run)')
-  addActivity(`▶ Start: ${NPX_RUN_COMMAND} --port ${cfg.port}`, true)
+  const spec = cfg.channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
+  const webArgs = buildWebArgs(cfg, cfg.channel === 'next')
+  addActivity(`▶ Start: npx ${spec} ${webArgs.join(' ')}`, true)
   // Windows: npx is a .cmd shim, so run it through the shell.
   // `--loglevel=http` makes npm print each package fetch (with timing) so
   // a long install is visible in the console instead of looking frozen.
-  spawnServer('npx', ['--loglevel', 'http', '-y', '@deepseek-ai/dsh', 'web', '--port', String(cfg.port)], undefined, process.platform === 'win32')
+  spawnServer('npx', ['--loglevel', 'http', '-y', spec, ...webArgs], undefined, process.platform === 'win32')
 }
 
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
@@ -815,7 +837,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   }
 
   // npx (and legacy auto) both use the official npx method (source needs explicit opt-in)
-  if (!(await prepareNpxInstall())) return false
+  if (!(await prepareNpxInstall(cfg))) return false
   spawnNpm(cfg)
   return waitForPort(cfg)
 }
@@ -934,7 +956,14 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
   if (cfg.mode !== 'source') return { hasUpdate: false, label: '' }
   const checkout = findSourceCheckout(cfg)
   if (!checkout) return { hasUpdate: false, label: '' }
-  await runFile('git', ['-C', checkout, 'fetch'])
+  const fetchResult = await runFile('git', ['-C', checkout, 'fetch'])
+  if (!fetchResult.ok) {
+    // Report the network failure instead of silently pretending there is no
+    // update — the user should know the check could not run.
+    const last = fetchResult.stderr.trim().split(/\r?\n/).pop()?.trim() || 'git fetch failed'
+    addActivity(`⚠ Update check failed (network) — ${last}`)
+    return { hasUpdate: false, label: '' }
+  }
   const r = await runFile('git', ['-C', checkout, 'rev-list', '--count', 'HEAD..@{upstream}'])
   if (!r.ok) return { hasUpdate: false, label: '' }
   const count = Number(r.stdout.trim())
