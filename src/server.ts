@@ -775,21 +775,28 @@ async function ensureCheckoutReady(checkout: string): Promise<boolean> {
     'Cancel',
   )
   if (pick !== 'Setup now') return false
-  addActivity(`▶ Setup: pnpm --dir "${checkout}" install`)
-  const installOk = await runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`)
-  if (!installOk) {
-    addActivity('✗ pnpm install failed')
-    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
-    return false
+  // Setup is part of the start: mark starting so the panel shows a spinner and
+  // disables the Start button (otherwise a slow install looks clickable again).
+  starting = true
+  try {
+    addActivity(`▶ Setup: pnpm --dir "${checkout}" install`)
+    const installOk = await runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`)
+    if (!installOk) {
+      addActivity('✗ pnpm install failed')
+      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
+      return false
+    }
+    addActivity(`▶ Setup: pnpm --dir "${checkout}" run build`)
+    const buildOk = await runInTerminal('Setup deepseek-harness (pnpm run build)', `pnpm --dir "${checkout}" run build`)
+    if (!buildOk) {
+      addActivity('✗ pnpm run build failed')
+      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
+      return false
+    }
+    return checkoutReady(checkout)
+  } finally {
+    starting = false
   }
-  addActivity(`▶ Setup: pnpm --dir "${checkout}" run build`)
-  const buildOk = await runInTerminal('Setup deepseek-harness (pnpm run build)', `pnpm --dir "${checkout}" run build`)
-  if (!buildOk) {
-    addActivity('✗ pnpm run build failed')
-    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
-    return false
-  }
-  return checkoutReady(checkout)
 }
 
 /** Make sure the server is running (no re-entrancy guard). */
@@ -830,6 +837,12 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     }
     if (!(await ensureCheckoutReady(repoPath))) {
       dshState = 'missing'
+      return false
+    }
+    // Setup may have run while the user pressed Stop; honour that request
+    // instead of starting a server nobody is waiting for.
+    if (stopRequested) {
+      starting = false
       return false
     }
     spawnSource(repoPath, cfg)
@@ -917,10 +930,11 @@ async function stopServerUnlocked(): Promise<boolean> {
     pids.push(owner)
     killPid(owner)
   }
+  const wasStarting = starting
   starting = false
   stopLogTail()
   if (pids.length === 0) {
-    addActivity('■ Server not running')
+    addActivity(wasStarting ? '■ Setup interrupted — no server will be started' : '■ Server not running')
     return false
   }
   addActivity('■ Stopping server…')
