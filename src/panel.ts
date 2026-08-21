@@ -98,9 +98,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .loading-overlay.hidden { opacity: 0; pointer-events: none; }
   .loading-spinner { width: 28px; height: 28px; border: 3px solid var(--vscode-panel-border); border-top-color: #4D6BFE; border-radius: 50%; animation: spin 1s linear infinite; }
   .loading-text { color: var(--vscode-descriptionForeground); font-size: 12px; }
-  .req-mark { width: 16px; text-align: center; flex: none; font-size: 11px; }
-  .req-mark.ok { color: #3fb950; }
-  .req-mark.missing { color: #f85149; }
   .mini-btn { background: transparent; border: 1px solid var(--vscode-panel-border); border-radius: 4px; color: var(--vscode-foreground); cursor: pointer; padding: 0 6px; font-size: 10px; font-weight: 500; flex: none; }
   .mini-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
   .ds-header { display: flex; align-items: center; gap: 6px; }
@@ -145,7 +142,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-main" id="statusText">Checking…</span>
         <span class="status-sub" id="statusSub"></span>
       </div>
-      <button class="icon-btn" id="refreshBtn" title="Re-check Node / dsh / updates">⟳</button>
       <div class="mode-toggle" id="modeToggle">
         <button class="mode-option" data-mode="pnpm" title="Install & run the published dsh via pnpm">pkg</button>
         <button class="mode-option" data-mode="source" title="Clone & run the deepseek-harness source">src</button>
@@ -153,15 +149,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="runtime-section">
       <div class="runtime-row">
-        <span class="runtime-label">node</span>
-        <span class="req-mark" id="req-node">·</span>
-        <span class="runtime-value" id="nodeVersion">—</span>
-      </div>
-      <div class="runtime-row">
         <span class="runtime-label">dsh</span>
-        <span class="req-mark" id="req-dsh">·</span>
         <span class="runtime-value" id="dshVersion">—</span>
         <button class="mini-btn" id="updateBtn" title="Update dsh" style="display:none">Update</button>
+        <button class="icon-btn" id="refreshBtn" title="Re-check for updates">⟳</button>
         <button class="icon-btn" id="uninstallBtn" title="Uninstall dsh (delete the install / source checkout)">🗑</button>
       </div>
     </div>
@@ -252,15 +243,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
       return (bytes / 1024 / 1024).toFixed(1) + ' MB'
     }
-    function setMark(id, state) {
-      const el = document.getElementById(id)
-      let txt = '·'; let cls = 'req-mark'
-      if (state === 'ok') { txt = '✓'; cls = 'req-mark ok' }
-      else if (state === 'missing') { txt = '✗'; cls = 'req-mark missing' }
-      el.textContent = txt
-      el.className = cls
-    }
-
     function renderRunning(status) {
       status = status || {}
       const running = !!(status.running)
@@ -295,11 +277,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
 
     function renderRuntime(status) {
       status = status || {}
-      document.getElementById('nodeVersion').textContent = status.nodeVersion ? ('v' + status.nodeVersion) : (status.node === 'missing' ? 'not found' : '—')
       const dshMissingText = status.dsh === 'missing' ? (status.mode === 'pnpm' ? 'pnpm not found' : 'not found') : '—'
       document.getElementById('dshVersion').textContent = status.dshVersion ? ('v' + status.dshVersion) : dshMissingText
-      setMark('req-node', status.node)
-      setMark('req-dsh', status.dsh)
 
       const upd = status.update
       const updateBtn = document.getElementById('updateBtn')

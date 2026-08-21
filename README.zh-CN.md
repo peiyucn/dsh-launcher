@@ -40,6 +40,7 @@
 | dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器；`external` 打开系统浏览器                 |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
 | dsh.path        | 空         | 可选：source 模式已有的 deepseek-harness 克隆路径；留空则扩展自动 clone 仓库         |
+| dsh.pkgPath      | 空         | 可选：pkg 模式安装 dsh 的自定义目录；留空则用扩展自管默认位置                    |
 | dsh.nodePath    | 空         | node.exe 路径；留空则使用 PATH 上的 node                              |
 | dsh.port        | 3080      | Web UI 端口                                                   |
 | dsh.sourceDebug | false     | source 模式打印模块加载进度（NODE_DEBUG=module，输出很多；console 显示周期性计数，完整明细在服务端日志） |

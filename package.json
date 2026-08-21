@@ -100,7 +100,12 @@
         "dsh.path": {
           "type": "string",
           "default": "",
-          "description": "Path to the deepseek-harness checkout for 'source' mode (must contain apps/cli/src/bin.ts). Leave empty unless you use source mode."
+          "description": "Optional: path to an existing deepseek-harness clone for source mode. When empty, the extension clones the repo automatically."
+        },
+        "dsh.pkgPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional: custom directory where pkg mode installs dsh. When empty, the extension uses a managed default location."
         },
         "dsh.nodePath": {
           "type": "string",

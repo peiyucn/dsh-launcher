@@ -61,7 +61,7 @@ test('parseDsStatus maps components, incidents and worst severity', () => {
   const st = parseDsStatus(json)
   assert.equal(st.state, 'down')
   assert.equal(st.components.length, 2)
-  assert.equal(st.components[0].name, 'deepseek-v3-chat api')
+  assert.equal(st.components[0].name, 'deepseek-v3-chat')
   assert.equal(st.components[0].status, 'partial_outage')
   assert.equal(st.components[1].status, 'operational')
   assert.equal(st.incidents.length, 1)

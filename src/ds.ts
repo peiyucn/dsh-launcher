@@ -103,9 +103,11 @@ export function parseDsStatus(json: any): DsStatus {
     const raw: Array<{ id: string; name: string; order: number }> = []
     for (const c of page.components ?? []) {
       const id = String(c?.component_id ?? '')
-      const name = toEnglish(String(c?.name ?? '')).toLowerCase().replace(/^deepseek\s+(v\d+)\s+(\S+)\s+api$/, 'deepseek-$1-$2 api')
-      // Only the two API services are monitored (skip Chat Service modes).
-      if (!id || !/api/i.test(name)) continue
+      const rawName = toEnglish(String(c?.name ?? '')).toLowerCase()
+      // Only API services are monitored (skip Chat Service modes).
+      if (!id || !/api/i.test(rawName)) continue
+      // Show just the model name: strip the trailing " api" suffix.
+      const name = rawName.replace(/^deepseek\s+(v\d+)\s+(\S+)\s+api$/, 'deepseek-$1-$2').replace(/\s+api$/, '')
       statusById.set(id, 'operational')
       raw.push({ id, name, order: Number(c?.order_id ?? 0) || 0 })
     }

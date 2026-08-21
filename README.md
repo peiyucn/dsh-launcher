@@ -40,6 +40,7 @@ Settings → search "dsh":
 | dsh.browser | built-in | `built-in` uses VS Code's Simple Browser; `external` opens the system browser |
 | dsh.hideConsole | true | Hide the server console window on Windows |
 | dsh.path | empty | Optional: path to an existing deepseek-harness clone for source mode. When empty, the extension clones the repo automatically. |
+| dsh.pkgPath | empty | Optional: custom directory where pkg mode installs dsh. When empty, a managed default location is used. |
 | dsh.nodePath | empty | Path to node.exe; empty uses the node on PATH |
 | dsh.port | 3080 | Web UI port |
 | dsh.sourceDebug | false | Print module-loading progress in source mode (NODE_DEBUG=module, very verbose; console shows a periodic count, full detail in the server log) |

@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.6]
 
+- The panel no longer shows the Node version (Node is checked only at Start, with console guidance to install it); the refresh button moved next to the dsh version and the ✓/✗ marks are gone.
+- Uninstall is now interactive: it asks to stop-and-uninstall when running, or to confirm when stopped.
+- On the first pkg/source install with no location configured, the user can pick the default or a custom folder (dsh.pkgPath / dsh.path).
+- The DeepSeek API Status card shows model names without the trailing "api".
 - Source mode now clones deepseek-harness automatically into a managed location (dsh.path is an optional override), so only Node.js needs to be pre-installed.
 - The panel now shows node / dsh / install / data together at the top (the separate Requirements card is gone); the dsh row has Update and 🗑 (uninstall) buttons, and update works for both modes (pkg reinstalls, source pulls). The `path` label was renamed to `install`.
 - pkg run mode (default) now installs dsh into a launcher-managed directory (`%LOCALAPPDATA%\dsh-launcher-panel\install`) via `pnpm install` and runs it with `pnpm exec dsh web` — no user-configured path, no per-start re-download, and no interactive prompts (dependency build scripts are approved non-interactively on pnpm ≥ 10.16, the same thing npm does by default). The previous npx-based mode was dropped because npm's peer resolver hangs on dsh's dependency graph.
