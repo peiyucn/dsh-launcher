@@ -309,6 +309,28 @@ async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string
   return { ok: major >= 24 || (major === 22 && minor >= 19), version }
 }
 
+/** Memoized one-shot Node check, run once at extension activation. */
+let nodeChecked: Promise<void> | undefined
+
+/**
+ * Check Node once (memoized) and cache the result. Called at activation so
+ * Start and the status refresh never re-probe Node.
+ */
+export function checkNodeOnce(): Promise<void> {
+  if (!nodeChecked) {
+    nodeChecked = (async () => {
+      const r = await checkNode(readConfig())
+      nodeState = r.ok ? 'ok' : 'missing'
+      nodeVersion = r.version
+      if (!r.ok) {
+        addActivity('✗ Node.js not found (need 22.19+ or >=24)')
+        void vscode.window.showErrorMessage('DeepSeek Harness requires Node.js 22.19+ (or >= 24). Install it from https://nodejs.org and restart VS Code.')
+      }
+    })()
+  }
+  return nodeChecked
+}
+
 /** The launcher's default dsh install dir for pkg mode. */
 function managedInstallDir(): string {
   return dshInstallDir()
@@ -942,17 +964,11 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     return true
   }
 
-  const nodeCheck = await checkNode(cfg)
-  if (!nodeCheck.ok) {
-    nodeState = 'missing'
+  await checkNodeOnce()
+  if (nodeState === 'missing') {
     addActivity('✗ Node.js not found (need 22.19+ or >=24)')
-    void vscode.window.showErrorMessage(
-      'DeepSeek Harness requires Node.js 22.19+ (or >= 24). Install it from https://nodejs.org and restart VS Code.',
-    )
     return false
   }
-  nodeState = 'ok'
-  addActivity('✓ Node.js detected')
 
   if (cfg.mode === 'source') {
     const repoPath = await ensureSourceCheckout(cfg)
@@ -1177,9 +1193,7 @@ export async function currentStatus(): Promise<ServerStatus> {
   // Periodically probe node/dsh so the panel reflects reality without a start.
   const now = Date.now()
   if (!detectionCache || now - detectionCache.at > DETECTION_CACHE_TTL_MS) {
-    const [nodeCheck, dshDet] = await Promise.all([checkNode(cfg), detectDsh(cfg)])
-    nodeState = nodeCheck.ok ? 'ok' : 'missing'
-    nodeVersion = nodeCheck.version
+    const dshDet = await detectDsh(cfg)
     dshState = dshDet.state
     dshSource = dshDet.source
     dshPath = dshDet.path
