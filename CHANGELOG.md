@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.1.6]
 
 - Fixed: pnpm-mode starts no longer hang at pnpm's interactive "Choose which packages to build" prompt — the launcher passes `--allow-build=**` (pnpm ≥ 10.9) so native dependency builds are approved non-interactively.
-- The pnpm/source mode toggle is now a compact vertical stack instead of a wide horizontal pill.
+- The pnpm/source mode toggle now uses a compact horizontal pill with short labels (`pkg` / `src`).
 - Start now pins the resolved channel version into the dlx spec (`pnpm dlx @deepseek-ai/dsh@<version>`), so pnpm installs the latest release instead of silently reusing a stale cached one; when the registry is unreachable it falls back to the best cached version.
 - When pnpm is missing, Start now logs it in the console and installs pnpm automatically without prompting (`npm install -g pnpm` in a visible terminal), then continues the start; detection also checks the Windows npm-global and pnpm standalone shim locations.
 - Replaced the npx run mode with pnpm: `pnpm` (default) runs `pnpm dlx @deepseek-ai/dsh web`, because npm's peer resolver can hang indefinitely on dsh's dependency graph while pnpm is the tool the dsh repo itself uses. `dsh.mode` is now `pnpm` / `source`, and the panel offers clear guidance when pnpm is missing.

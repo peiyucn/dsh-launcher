@@ -61,8 +61,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .status-main { font-weight: 600; }
   .status-sub { color: var(--vscode-descriptionForeground); font-size: 11px; word-break: break-all; }
-  .mode-toggle { display: flex; flex-direction: column; align-items: stretch; margin-left: auto; background: var(--vscode-input-background); border: 1px solid var(--vscode-panel-border); border-radius: 10px; padding: 2px; gap: 2px; flex: none; }
-  .mode-option { border: none; border-radius: 8px; padding: 3px 12px; background: transparent; color: var(--vscode-descriptionForeground); cursor: pointer; font-size: 11px; font-weight: 600; font-family: inherit; text-align: center; transition: background .12s, color .12s; }
+  .mode-toggle { display: flex; flex-direction: row; margin-left: auto; background: var(--vscode-input-background); border: 1px solid var(--vscode-panel-border); border-radius: 999px; padding: 2px; gap: 2px; flex: none; }
+  .mode-option { border: none; border-radius: 999px; padding: 2px 8px; background: transparent; color: var(--vscode-descriptionForeground); cursor: pointer; font-size: 10px; font-weight: 600; font-family: inherit; transition: background .12s, color .12s; }
   .mode-option.active { background: #4D6BFE; color: #fff; }
   .runtime-path-block { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
   .runtime-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
@@ -152,8 +152,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-sub" id="statusSub"></span>
       </div>
       <div class="mode-toggle" id="modeToggle">
-        <button class="mode-option" data-mode="pnpm">pnpm</button>
-        <button class="mode-option" data-mode="source">source</button>
+        <button class="mode-option" data-mode="pnpm" title="Run the published dsh via pnpm dlx">pkg</button>
+        <button class="mode-option" data-mode="source" title="Run a local source checkout via tsx">src</button>
       </div>
     </div>
     <div class="runtime-path-block" id="runtimePathBlock">
