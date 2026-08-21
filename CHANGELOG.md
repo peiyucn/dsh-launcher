@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6]
+
+- Fixed: source-mode setup (`pnpm install` + build) now counts as "starting" — the panel shows progress and the Start button stays disabled instead of looking clickable mid-build.
+- Fixed: Stop pressed during setup is honoured — no server is started afterwards (with an accurate "Setup interrupted" message).
+- Tests are now TypeScript (run via tsx against the source directly); the repository no longer contains JavaScript.
+
 ## [0.1.5]
 
 - dsh ≥ rc.8 passes `--no-open`, keeping the panel's `dsh.browser` choice as the only opener (rc.8 opens the system browser on its own).
