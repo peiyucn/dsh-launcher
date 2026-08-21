@@ -18,13 +18,13 @@ import {
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
-  bestDshVersionInDlxCache,
+  dshInstallDir,
   dshVersionAtLeast,
   findPnpm,
+  installedDshVersion,
   isProcessAlive,
   maskPath,
-  pnpmCacheRoot,
-  pnpmSupportsAllowBuild,
+  pnpmSupportsDangerouslyAllowAllBuilds,
   psQuote,
   quoteCmdArg,
   resolveDshHome,
@@ -305,11 +305,14 @@ async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string
   return { ok: major >= 24 || (major === 22 && minor >= 19), version }
 }
 
-/** Read the newest @deepseek-ai/dsh version cached under the pnpm dlx cache. */
-function pnpmCachedDshVersion(): string | undefined {
-  const root = pnpmCacheRoot()
-  if (!root) return undefined
-  return bestDshVersionInDlxCache(path.join(root, 'dlx'))
+/** The launcher-owned dsh install dir for pkg mode (no user-configured path). */
+function managedInstallDir(): string {
+  return dshInstallDir()
+}
+
+/** The installed @deepseek-ai/dsh version in the managed dir (undefined when absent). */
+function managedDshVersion(): string | undefined {
+  return installedDshVersion(managedInstallDir())
 }
 
 /** Resolve the published @deepseek-ai/dsh version for a channel (undefined on failure). */
@@ -329,35 +332,70 @@ async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<
 }
 
 /**
- * Prepare the pnpm start: resolve the dsh version to run for the channel and
- * announce installs. The version is pinned into the dlx spec, so a new
- * release changes the spec and pnpm installs it instead of silently reusing
- * a stale cached install. Offline, the best cached version is used instead.
- * Returns the spec to run, or undefined to abort the start.
+ * Prepare the pkg start: resolve the dsh version for the channel, install it
+ * into the managed dir when missing or outdated, and report progress. Offline,
+ * the installed version is used instead. Returns the version to run, or
+ * undefined to abort the start.
  */
-async function preparePnpmStart(cfg: DshConfig, pnpmCmd: string): Promise<{ spec: string; version: string } | undefined> {
+async function preparePkgStart(cfg: DshConfig, pnpmCmd: string, allowBuild: boolean): Promise<string | undefined> {
   // The registry query can take a few seconds; show it so a slow network
   // does not look like a frozen Start.
   addActivity('ℹ Resolving the dsh channel version…', true)
   let version = await latestDshVersion(cfg.channel, pnpmCmd)
   finishBusy()
-  if (!version) version = pnpmCachedDshVersion()
+  if (!version) version = managedDshVersion()
   if (!version) {
     dshState = 'missing'
     addActivity('✗ dsh is not installed and the registry is unreachable — check your network and try again')
     void vscode.window.showErrorMessage('DeepSeek Harness: unable to reach the registry to install dsh. Check your network connection.')
     return undefined
   }
-  const cached = pnpmCachedDshVersion()
-  if (cached === undefined) {
-    addActivity(`ℹ dsh v${version} — pnpm will install it on first run; this can take a while, please wait`)
-  } else if (cached !== version) {
-    addActivity(`ℹ dsh v${version} will run (cached: v${cached}) — pnpm will install it first; this can take a while`)
+  const installed = managedDshVersion()
+  if (installed === undefined) {
+    addActivity(`ℹ dsh v${version} — installing it now (first run, can take a few minutes)`)
+  } else if (installed !== version) {
+    addActivity(`ℹ dsh v${version} will run (installed: v${installed}) — updating first`)
   }
   // The panel shows the version that is about to run (buildWebArgs also reads
   // this to decide --no-open).
   dshVersion = version
-  return { spec: `@deepseek-ai/dsh@${version}`, version }
+  if (installed !== version && !(await ensureDshInstalled(version, pnpmCmd, allowBuild))) return undefined
+  return version
+}
+
+/**
+ * Install @deepseek-ai/dsh@<version> into the managed dir: write the pinned
+ * manifest and run `pnpm install`, approving build scripts non-interactively
+ * on pnpm ≥ 10.16 (the same thing npm does on every install). Returns true
+ * once the requested version is present.
+ */
+async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: boolean): Promise<boolean> {
+  const dir = managedInstallDir()
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+      name: 'dsh-install',
+      private: true,
+      dependencies: { '@deepseek-ai/dsh': version },
+    }, null, 2) + '\n')
+  } catch {
+    addActivity('✗ could not write the dsh install manifest — check write permissions')
+    return false
+  }
+  // Installing dsh is part of the start: mark starting so the panel shows a
+  // spinner and the Start button stays disabled while pnpm works.
+  starting = true
+  addActivity(`▶ Installing dsh v${version} (pnpm install)…`)
+  const args = ['install', '--dir', quoteCmdArg(dir)]
+  if (allowBuild) args.push('--dangerously-allow-all-builds')
+  const ok = await runInTerminal(`Install dsh v${version}`, `${pnpmCmd} ${args.join(' ')}`)
+  starting = false
+  if (!ok || managedDshVersion() !== version) {
+    addActivity('✗ dsh install failed — see the terminal output above')
+    void vscode.window.showErrorMessage('DeepSeek Harness: dsh install failed. Check the terminal output.')
+    return false
+  }
+  return true
 }
 /** The pnpm version string ('' on failure). */
 async function pnpmVersion(pnpmCmd: string): Promise<string> {
@@ -372,13 +410,13 @@ async function pnpmVersion(pnpmCmd: string): Promise<string> {
  * Windows shim locations), and install it via npm when missing. There is no
  * prompt — without pnpm the start cannot proceed, so the console announces
  * the reason and the install begins immediately.
- * Returns the resolved command and whether dlx accepts --allow-build
- * (build-script approval, which would otherwise prompt interactively), or
- * undefined when the start must abort.
+ * Returns the resolved command and whether install accepts
+ * --dangerously-allow-all-builds (build-script approval, which would
+ * otherwise prompt interactively), or undefined when the start must abort.
  */
 async function ensurePnpmAvailable(): Promise<{ command: string; allowBuild: boolean } | undefined> {
   const found = await findPnpm()
-  if (found) return { command: found, allowBuild: pnpmSupportsAllowBuild(await pnpmVersion(found)) }
+  if (found) return { command: found, allowBuild: pnpmSupportsDangerouslyAllowAllBuilds(await pnpmVersion(found)) }
   dshState = 'missing'
   addActivity('✗ pnpm not found — installing it now (npm install -g pnpm)')
   // Installing pnpm is part of the start: mark starting so the panel shows a
@@ -400,7 +438,7 @@ async function ensurePnpmAvailable(): Promise<{ command: string; allowBuild: boo
   }
   dshState = 'unknown'
   addActivity('✓ pnpm installed')
-  return { command: after, allowBuild: pnpmSupportsAllowBuild(await pnpmVersion(after)) }
+  return { command: after, allowBuild: pnpmSupportsDangerouslyAllowAllBuilds(await pnpmVersion(after)) }
 }
 
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
@@ -453,7 +491,7 @@ async function pickRepoFolder(): Promise<string | undefined> {
   return dir
 }
 
-/** Detect the local dsh version: a source checkout (source mode), else the pnpm dlx cache. */
+/** Detect the local dsh version: a source checkout (source mode), else the managed install. */
 function detectDshVersion(cfg: DshConfig): void {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
@@ -470,8 +508,8 @@ function detectDshVersion(cfg: DshConfig): void {
     }
     return
   }
-  // pnpm mode: only the pnpm dlx cache counts (pnpm dlx reinstalls from the registry on demand).
-  dshVersion = pnpmCachedDshVersion() ?? ''
+  // pkg mode: only the managed install counts (Start reinstalls from the registry on demand).
+  dshVersion = managedDshVersion() ?? ''
 }
 
 interface DshDetection {
@@ -480,7 +518,7 @@ interface DshDetection {
   path: string
 }
 
-/** Detect dsh: source mode uses a checkout; pnpm uses the official pnpm dlx method. */
+/** Detect dsh: source mode uses a checkout; pkg uses the managed pnpm install. */
 async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
@@ -488,9 +526,9 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
     return { state: 'missing', source: '', path: '' }
   }
   if (!(await findPnpm())) return { state: 'missing', source: '', path: '' }
-  // pnpm present: 'ok' only when dsh is already cached; otherwise the first
-  // start will download it, so mark it 'unknown' (version stays empty).
-  return pnpmCachedDshVersion() !== undefined
+  // pnpm present: 'ok' only when dsh is already installed; otherwise the
+  // first start will install it, so mark it 'unknown' (version stays empty).
+  return managedDshVersion() !== undefined
     ? { state: 'ok', source: 'pnpm', path: '' }
     : { state: 'unknown', source: 'pnpm', path: '' }
 }
@@ -725,25 +763,20 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', ...webArgs], repoPath, false, env)
 }
 
-/** pnpm mode: run the official `pnpm dlx @deepseek-ai/dsh web` command with the resolved version pinned. */
-function spawnPnpm(cfg: DshConfig, pnpmCmd: string, spec: string, allowBuild: boolean): void {
+/** pkg mode: run the managed dsh via `pnpm exec dsh web` (pnpm sets up the module path). */
+function spawnPkg(cfg: DshConfig, pnpmCmd: string): void {
   dshState = 'ok'
-  addActivity('✓ dsh detected (pnpm dlx run)')
+  addActivity('✓ dsh detected (pkg run)')
   const webArgs = buildWebArgs(cfg)
-  // pnpm ≥ 10.9 blocks dependency build scripts (node-pty, koffi, …) and
-  // would prompt interactively — approve all builds non-interactively, since
-  // the hidden console has no stdin to answer with.
-  const dlxArgs = allowBuild ? ['dlx', '--allow-build=**', spec, ...webArgs] : ['dlx', spec, ...webArgs]
-  addActivity(`▶ Start: pnpm dlx ${spec} ${webArgs.join(' ')}`, true)
+  addActivity(`▶ Start: pnpm exec dsh ${webArgs.join(' ')}`, true)
+  const dir = managedInstallDir()
   if (process.platform === 'win32') {
     // pnpm is a .cmd shim: drive it through cmd with the arguments array, so
     // Windows quoting keeps fallback shim paths (possibly containing spaces)
     // intact in both the hidden-console and the visible-console spawn paths.
-    // pnpm prints per-package download progress, so a long install stays
-    // visible in the console instead of looking frozen.
-    spawnServer('cmd', ['/c', pnpmCmd, ...dlxArgs], undefined, false)
+    spawnServer('cmd', ['/c', pnpmCmd, 'exec', 'dsh', ...webArgs], dir, false)
   } else {
-    spawnServer(pnpmCmd, dlxArgs, undefined, false)
+    spawnServer(pnpmCmd, ['exec', 'dsh', ...webArgs], dir, false)
   }
 }
 
@@ -903,19 +936,19 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     return waitForPort(cfg)
   }
 
-  // pnpm mode: the official `pnpm dlx @deepseek-ai/dsh web` method (source needs explicit opt-in)
+  // pkg mode: install dsh into the managed pnpm project, then run it (source needs explicit opt-in)
   const pnpmCmd = await ensurePnpmAvailable()
   if (!pnpmCmd) return false
-  const run = await preparePnpmStart(cfg, pnpmCmd.command)
-  if (!run) return false
-  spawnPnpm(cfg, pnpmCmd.command, run.spec, pnpmCmd.allowBuild)
+  const version = await preparePkgStart(cfg, pnpmCmd.command, pnpmCmd.allowBuild)
+  if (!version) return false
+  spawnPkg(cfg, pnpmCmd.command)
   return waitForPort(cfg)
 }
 
 /**
  * Make sure the server is running. Resolution: a source checkout (git clone)
- * or the official `pnpm dlx @deepseek-ai/dsh web` method. Concurrent calls
- * coalesce onto the in-flight run.
+ * or a managed pnpm install of the published dsh (`pnpm exec dsh web`).
+ * Concurrent calls coalesce onto the in-flight run.
  */
 export function ensureRunning(cfg: DshConfig = readConfig()): Promise<boolean> {
   return exclusive(() => ensureRunningUnlocked(cfg))
@@ -1057,7 +1090,7 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
 export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
   if (cfg.mode !== 'source') {
-    addActivity('↑ No update needed (pnpm mode resolves latest)')
+    addActivity('↑ No update needed (pkg mode installs the latest on start)')
     return
   }
   const checkout = findSourceCheckout(cfg)

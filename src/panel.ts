@@ -152,7 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-sub" id="statusSub"></span>
       </div>
       <div class="mode-toggle" id="modeToggle">
-        <button class="mode-option" data-mode="pnpm" title="Run the published dsh via pnpm dlx">pkg</button>
+        <button class="mode-option" data-mode="pnpm" title="Install & run the published dsh via pnpm">pkg</button>
         <button class="mode-option" data-mode="source" title="Run a local source checkout via tsx">src</button>
       </div>
     </div>

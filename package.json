@@ -72,7 +72,7 @@
             "source"
           ],
           "default": "pnpm",
-          "description": "How to run DeepSeek Harness: 'pnpm' runs 'pnpm dlx @deepseek-ai/dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
+          "description": "How to run DeepSeek Harness: 'pnpm' installs dsh into a launcher-managed location and runs 'pnpm exec dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
         },
         "dsh.channel": {
           "type": "string",

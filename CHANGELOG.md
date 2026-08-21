@@ -4,11 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.6]
 
-- Fixed: pnpm-mode starts no longer hang at pnpm's interactive "Choose which packages to build" prompt — the launcher passes `--allow-build=**` (pnpm ≥ 10.9) so native dependency builds are approved non-interactively.
+- pkg run mode (default) now installs dsh into a launcher-managed directory (`%LOCALAPPDATA%\dsh-launcher-panel\install`) via `pnpm install` and runs it with `pnpm exec dsh web` — no user-configured path, no per-start re-download, and no interactive prompts (dependency build scripts are approved non-interactively on pnpm ≥ 10.16, the same thing npm does by default). The previous npx-based mode was dropped because npm's peer resolver hangs on dsh's dependency graph.
 - The pnpm/source mode toggle now uses a compact horizontal pill with short labels (`pkg` / `src`).
-- Start now pins the resolved channel version into the dlx spec (`pnpm dlx @deepseek-ai/dsh@<version>`), so pnpm installs the latest release instead of silently reusing a stale cached one; when the registry is unreachable it falls back to the best cached version.
-- When pnpm is missing, Start now logs it in the console and installs pnpm automatically without prompting (`npm install -g pnpm` in a visible terminal), then continues the start; detection also checks the Windows npm-global and pnpm standalone shim locations.
-- Replaced the npx run mode with pnpm: `pnpm` (default) runs `pnpm dlx @deepseek-ai/dsh web`, because npm's peer resolver can hang indefinitely on dsh's dependency graph while pnpm is the tool the dsh repo itself uses. `dsh.mode` is now `pnpm` / `source`, and the panel offers clear guidance when pnpm is missing.
+- When pnpm is missing, Start logs it in the console and installs pnpm automatically without prompting (`npm install -g pnpm` in a visible terminal), then continues the start; detection also checks the Windows npm-global and pnpm standalone shim locations.
 - Fixed: source-mode setup (`pnpm install` + build) now counts as "starting" — the panel shows progress and the Start button stays disabled instead of looking clickable mid-build.
 - Fixed: Stop pressed during setup is honoured — no server is started afterwards (with an accurate "Setup interrupted" message).
 - Tests are now TypeScript (run via tsx against the source directly); the repository no longer contains JavaScript.

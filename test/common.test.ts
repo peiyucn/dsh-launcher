@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { bestDshVersionInDlxCache, dshVersionAtLeast, isProcessAlive, maskPath, pnpmCacheRoot, pnpmSupportsAllowBuild, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('dshVersionAtLeast compares prerelease versions numerically', () => {
   assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)
@@ -54,28 +54,42 @@ test('isProcessAlive reports own pid alive and an impossible pid dead', () => {
   assert.equal(isProcessAlive(999999999), false)
 })
 
-test('pnpmCacheRoot resolves the platform cache root', () => {
-  assert.equal(pnpmCacheRoot('darwin', {}, '/Users/me'), join('/Users/me', 'Library', 'Caches', 'pnpm'))
-  assert.equal(pnpmCacheRoot('linux', { XDG_CACHE_HOME: '/xdg' }, '/home/me'), join('/xdg', 'pnpm'))
-  assert.equal(pnpmCacheRoot('linux', {}, '/home/me'), join('/home/me', '.cache', 'pnpm'))
+test('dshInstallDir resolves the platform data dir', () => {
+  assert.equal(dshInstallDir('darwin', {}, '/Users/me'), join('/Users/me', 'Library', 'Application Support', 'dsh-launcher-panel', 'install'))
+  assert.equal(dshInstallDir('linux', { XDG_DATA_HOME: '/xdg' }, '/home/me'), join('/xdg', 'dsh-launcher-panel', 'install'))
+  assert.equal(dshInstallDir('linux', {}, '/home/me'), join('/home/me', '.local', 'share', 'dsh-launcher-panel', 'install'))
 })
 
-test('pnpmCacheRoot uses LOCALAPPDATA on win32', (t) => {
+test('dshInstallDir uses LOCALAPPDATA on win32', (t) => {
   if (process.platform !== 'win32') {
     t.skip('win32-only path')
     return
   }
-  assert.equal(pnpmCacheRoot('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), 'C:\\Users\\me\\AppData\\Local\\pnpm-cache')
-  assert.equal(pnpmCacheRoot('win32', {}, 'C:\\Users\\me'), 'C:\\Users\\me\\AppData\\Local\\pnpm-cache')
+  assert.equal(dshInstallDir('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), join('C:\\Users\\me\\AppData\\Local', 'dsh-launcher-panel', 'install'))
 })
 
-test('pnpmSupportsAllowBuild gates on pnpm 10.9+', () => {
-  assert.equal(pnpmSupportsAllowBuild('11.22.0'), true)
-  assert.equal(pnpmSupportsAllowBuild('10.16.0'), true)
-  assert.equal(pnpmSupportsAllowBuild('10.9.0'), true)
-  assert.equal(pnpmSupportsAllowBuild('10.8.2'), false)
-  assert.equal(pnpmSupportsAllowBuild('9.15.4'), false)
-  assert.equal(pnpmSupportsAllowBuild(''), false)
+test('pnpmSupportsDangerouslyAllowAllBuilds gates on pnpm 10.16+', () => {
+  assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('11.22.0'), true)
+  assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('10.16.0'), true)
+  assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('10.15.0'), false)
+  assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('9.15.4'), false)
+  assert.equal(pnpmSupportsDangerouslyAllowAllBuilds(''), false)
+})
+
+test('installedDshVersion reads the managed install version', () => {
+  const root = join(tmpdir(), 'dsh-install-test-' + process.pid)
+  try {
+    const dir = join(root, 'node_modules', '@deepseek-ai', 'dsh')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.1.1-rc.2' }))
+    assert.equal(installedDshVersion(root), '0.1.1-rc.2')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('installedDshVersion returns undefined when absent', () => {
+  assert.equal(installedDshVersion(join(tmpdir(), 'dsh-install-none-' + process.pid)), undefined)
 })
 
 test('windowsPnpmCandidates lists the npm-global and pnpm shims', () => {
@@ -85,29 +99,6 @@ test('windowsPnpmCandidates lists the npm-global and pnpm shims', () => {
     join('C:\\Users\\me\\AppData\\Local', 'pnpm', 'pnpm.cmd'),
   ])
   assert.deepEqual(windowsPnpmCandidates({}), [])
-})
-
-test('bestDshVersionInDlxCache scans dlx slots and picks the newest dsh', () => {
-  const root = join(tmpdir(), 'dsh-dlx-test-' + process.pid)
-  try {
-    const mk = (v: string): void => {
-      const dir = join(root, 'hash-' + v, 'tmp', 'node_modules', '@deepseek-ai', 'dsh')
-      mkdirSync(dir, { recursive: true })
-      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: v }))
-    }
-    mk('0.1.0-rc.8')
-    mk('0.1.1-rc.2')
-    mk('0.1.0-rc.7')
-    // slots without dsh are ignored
-    mkdirSync(join(root, 'hash-other', 'tmp', 'node_modules', 'some-pkg'), { recursive: true })
-    assert.equal(bestDshVersionInDlxCache(root), '0.1.1-rc.2')
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
-})
-
-test('bestDshVersionInDlxCache returns undefined when the cache is absent', () => {
-  assert.equal(bestDshVersionInDlxCache(join(tmpdir(), 'dsh-dlx-none-' + process.pid)), undefined)
 })
 
 test('resolveDshHome prefers DSH_HOME and falls back to ~/.dsh', () => {

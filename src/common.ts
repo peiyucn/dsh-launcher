@@ -107,69 +107,50 @@ export function runFile(command: string, args: string[], timeoutMs = 0): Promise
 }
 
 /**
- * Whether a pnpm version (like '11.22.0') supports dlx's --allow-build flag
- * (pnpm ≥ 10.9, where build scripts are blocked by default and would
- * otherwise prompt interactively).
+ * Whether a pnpm version (like '11.22.0') supports install's
+ * --dangerously-allow-all-builds flag (pnpm ≥ 10.16), which approves
+ * dependency build scripts non-interactively — the same thing npm does by
+ * default on every install.
  */
-export function pnpmSupportsAllowBuild(version: string): boolean {
+export function pnpmSupportsDangerouslyAllowAllBuilds(version: string): boolean {
   const m = /^(\d+)\.(\d+)/.exec(version.trim())
   if (!m) return false
   const major = Number(m[1])
   const minor = Number(m[2])
-  return major > 10 || (major === 10 && minor >= 9)
+  return major > 10 || (major === 10 && minor >= 16)
 }
 
-// --- pnpm dlx cache ---
+// --- managed install ---
 
 /**
- * The pnpm cache root for the current platform (pnpm's default cache-dir).
- * dlx downloads live under <cache>/dlx.
+ * The launcher's managed dsh install directory — a private pnpm project the
+ * launcher owns, so pkg mode needs no user-configured path. Persistent (not
+ * temp): %LOCALAPPDATA% on Windows, Application Support on macOS, XDG data
+ * home on Linux.
  */
-export function pnpmCacheRoot(
+export function dshInstallDir(
   platform: NodeJS.Platform = process.platform,
   env: Record<string, string | undefined> = process.env,
   home: string = os.homedir(),
-): string | undefined {
+): string {
   if (platform === 'win32') {
     const base = env.LOCALAPPDATA && env.LOCALAPPDATA.trim() !== '' ? env.LOCALAPPDATA : path.join(home, 'AppData', 'Local')
-    return path.join(base, 'pnpm-cache')
+    return path.join(base, 'dsh-launcher-panel', 'install')
   }
-  if (platform === 'darwin') return path.join(home, 'Library', 'Caches', 'pnpm')
-  const base = env.XDG_CACHE_HOME && env.XDG_CACHE_HOME.trim() !== '' ? env.XDG_CACHE_HOME : path.join(home, '.cache')
-  return path.join(base, 'pnpm')
+  if (platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'dsh-launcher-panel', 'install')
+  const base = env.XDG_DATA_HOME && env.XDG_DATA_HOME.trim() !== '' ? env.XDG_DATA_HOME : path.join(home, '.local', 'share')
+  return path.join(base, 'dsh-launcher-panel', 'install')
 }
 
-/**
- * The best @deepseek-ai/dsh version found under a pnpm dlx cache root
- * (dlx/<hash>/<tmp>/node_modules/@deepseek-ai/dsh/package.json).
- */
-export function bestDshVersionInDlxCache(dlxRoot: string): string | undefined {
-  let best: string | undefined
+/** The installed @deepseek-ai/dsh version under a managed install dir (undefined when absent). */
+export function installedDshVersion(installDir: string): string | undefined {
   try {
-    for (const entry of fs.readdirSync(dlxRoot, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue
-      const hashDir = path.join(dlxRoot, entry.name)
-      let slots: fs.Dirent[]
-      try {
-        slots = fs.readdirSync(hashDir, { withFileTypes: true })
-      } catch {
-        continue // unreadable dlx entry
-      }
-      for (const slot of slots) {
-        if (!slot.isDirectory()) continue
-        try {
-          const pkg = JSON.parse(fs.readFileSync(path.join(hashDir, slot.name, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')) as { version?: string }
-          const v = pkg?.version
-          if (v && (best === undefined || dshVersionAtLeast(v, best))) best = v
-        } catch {
-          // no dsh package in this dlx slot
-        }
-      }
-    }
+    const pkg = JSON.parse(fs.readFileSync(path.join(installDir, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')) as { version?: string }
+    return pkg?.version || undefined
   } catch {
-    // no dlx cache
+    // not installed
   }
-  return best
+  return undefined
 }
 
 /** Candidate pnpm.cmd shim locations on Windows (npm global bin, pnpm standalone installer). */
