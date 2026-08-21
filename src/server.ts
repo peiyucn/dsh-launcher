@@ -22,6 +22,7 @@ import {
   dshVersionAtLeast,
   findPnpm,
   installedDshVersion,
+  managedSourceDir,
   isProcessAlive,
   maskPath,
   pnpmSupportsDangerouslyAllowAllBuilds,
@@ -455,40 +456,33 @@ function isDshCheckout(dir: string | undefined): boolean {
 }
 
 /**
- * Locate a source checkout from the explicit `dsh.path` setting only. A git
- * clone can live anywhere on disk, so the path (or the source-mode folder
- * picker) is the authoritative answer; we do not scan the workspace.
+ * Locate the source checkout: the explicit `dsh.path` setting when it is a
+ * valid checkout, else the launcher's managed clone.
  */
 function findSourceCheckout(cfg: DshConfig): string | undefined {
   if (isDshCheckout(cfg.path)) return cfg.path
-  return undefined
+  const managed = managedSourceDir()
+  return isDshCheckout(managed) ? managed : undefined
 }
 
-/** Persist the picked dsh path into the dsh.path setting (idempotent). */
-async function saveDshPath(value: string): Promise<void> {
-  const c = vscode.workspace.getConfiguration('dsh')
-  if ((c.get<string>('path') ?? '') !== value) {
-    await c.update('path', value, vscode.ConfigurationTarget.Global)
-  }
-}
-
-/** Ask the user to pick the checkout folder once, then remember it in dsh.path. */
-async function pickRepoFolder(): Promise<string | undefined> {
-  const picked = await vscode.window.showOpenDialog({
-    canSelectFolders: true,
-    canSelectFiles: false,
-    canSelectMany: false,
-    openLabel: 'Select deepseek-harness repo',
-    title: 'Select the deepseek-harness source checkout (must contain apps/cli/src/bin.ts)',
-  })
-  const dir = picked?.[0]?.fsPath
-  if (!dir) return undefined
-  if (!isDshCheckout(dir)) {
-    void vscode.window.showWarningMessage('The selected folder is not a deepseek-harness checkout (missing apps/cli/src/bin.ts).')
+/** Make sure a source checkout exists: reuse one, or clone deepseek-harness into the managed dir. */
+async function ensureSourceCheckout(cfg: DshConfig): Promise<string | undefined> {
+  const existing = findSourceCheckout(cfg)
+  if (existing) return existing
+  const managed = managedSourceDir()
+  dshState = 'missing'
+  addActivity('✗ No dsh source checkout found — cloning deepseek-harness…')
+  starting = true
+  addActivity(`▶ Cloning deepseek-harness → ${managed}`)
+  const ok = await runInTerminal('Clone deepseek-harness', `git clone https://github.com/deepseek-ai/deepseek-harness.git "${managed}"`)
+  starting = false
+  if (!ok || !isDshCheckout(managed)) {
+    addActivity('✗ clone failed — see the terminal output above')
+    void vscode.window.showErrorMessage('DeepSeek Harness: could not clone deepseek-harness. Check your network and git, then try again.')
     return undefined
   }
-  await saveDshPath(dir)
-  return dir
+  addActivity('✓ deepseek-harness cloned')
+  return managed
 }
 
 /** Detect the local dsh version: a source checkout (source mode), else the managed install. */
@@ -523,14 +517,15 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
-    return { state: 'missing', source: '', path: '' }
+    // Not cloned yet, but Start will clone it; report where it will live.
+    return { state: 'unknown', source: 'source', path: managedSourceDir() }
   }
   if (!(await findPnpm())) return { state: 'missing', source: '', path: '' }
   // pnpm present: 'ok' only when dsh is already installed; otherwise the
   // first start will install it, so mark it 'unknown' (version stays empty).
   return managedDshVersion() !== undefined
-    ? { state: 'ok', source: 'pnpm', path: '' }
-    : { state: 'unknown', source: 'pnpm', path: '' }
+    ? { state: 'ok', source: 'pnpm', path: managedInstallDir() }
+    : { state: 'unknown', source: 'pnpm', path: managedInstallDir() }
 }
 
 /** Run a command in a visible VS Code terminal (used for updates). */
@@ -910,19 +905,8 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   addActivity('✓ Node.js detected')
 
   if (cfg.mode === 'source') {
-    let repoPath = findSourceCheckout(cfg)
-    if (!repoPath) {
-      // A git clone can live anywhere on disk, so ask once and remember it.
-      repoPath = await pickRepoFolder()
-      if (!repoPath) {
-        dshState = 'missing'
-        addActivity('✗ No source checkout found — set dsh.path or pick the repo folder')
-        void vscode.window.showErrorMessage(
-          'DeepSeek Harness: no source checkout found. Pick the repo folder containing apps/cli/src/bin.ts, or set dsh.path.',
-        )
-        return false
-      }
-    }
+    const repoPath = await ensureSourceCheckout(cfg)
+    if (!repoPath) return false
     if (!(await ensureCheckoutReady(repoPath))) {
       dshState = 'missing'
       return false
@@ -1056,9 +1040,17 @@ export function stopServer(): Promise<boolean> {
   return stopInFlight
 }
 
-/** Check for a newer dsh version (source mode only: git commits ahead of upstream). */
+/** Check for a newer dsh version: pkg compares the registry, source compares git upstream. */
 async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
-  if (cfg.mode !== 'source') return { hasUpdate: false, label: '' }
+  if (cfg.mode === 'pnpm') {
+    const installed = managedDshVersion()
+    if (!installed) return { hasUpdate: false, label: '' }
+    const latest = await latestDshVersion(cfg.channel)
+    if (latest && latest !== installed && dshVersionAtLeast(latest, installed)) {
+      return { hasUpdate: true, label: `v${latest}` }
+    }
+    return { hasUpdate: false, label: '' }
+  }
   const checkout = findSourceCheckout(cfg)
   if (!checkout) return { hasUpdate: false, label: '' }
   const fetchResult = await runFile('git', ['-C', checkout, 'fetch'])
@@ -1087,22 +1079,67 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
   return { hasUpdate: true, label }
 }
 
-/** Update dsh (source mode only): pull the configured checkout. */
+/** Update dsh: pkg reinstalls the latest published version; source pulls the checkout. */
 export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
-  if (cfg.mode !== 'source') {
-    addActivity('↑ No update needed (pkg mode installs the latest on start)')
+  if (cfg.mode === 'pnpm') {
+    const pnpm = await ensurePnpmAvailable()
+    if (!pnpm) return
+    const latest = await latestDshVersion(cfg.channel, pnpm.command)
+    if (!latest) {
+      addActivity('↑ Update check failed (network) — could not resolve the latest dsh version')
+      return
+    }
+    if (managedDshVersion() === latest) {
+      addActivity('↑ dsh is already up to date')
+      return
+    }
+    addActivity(`↑ Updating dsh to v${latest}…`)
+    if (await ensureDshInstalled(latest, pnpm.command, pnpm.allowBuild)) {
+      addActivity('↑ dsh updated')
+      updateCache = undefined
+    }
     return
   }
   const checkout = findSourceCheckout(cfg)
   if (!checkout) {
-    addActivity('↑ No source checkout configured (set dsh.path)')
+    addActivity('↑ No source checkout configured')
     return
   }
   addActivity('↑ Updating dsh (git pull)…')
   const ok = await runInTerminal('Update DeepSeek Harness', `git -C "${checkout}" pull`)
   addActivity(ok ? '↑ dsh updated' : '↑ dsh update failed')
   if (ok) updateCache = undefined
+}
+
+/** Uninstall dsh for the current mode: delete the managed install or the source checkout. */
+export async function runDshUninstall(): Promise<void> {
+  const cfg = readConfig()
+  if (await isPortOpen(LOOPBACK_HOST, cfg.port)) {
+    addActivity('⚠ Stop the server before uninstalling')
+    void vscode.window.showInformationMessage('DeepSeek Harness: stop the server before uninstalling dsh.')
+    return
+  }
+  const dir = cfg.mode === 'source' ? findSourceCheckout(cfg) : managedInstallDir()
+  if (!dir) {
+    addActivity('⚠ Nothing to uninstall')
+    return
+  }
+  const pick = await vscode.window.showWarningMessage(
+    `Delete the dsh ${cfg.mode === 'source' ? 'source checkout' : 'install'} at ${dir}?`,
+    { modal: true },
+    'Delete',
+  )
+  if (pick !== 'Delete') return
+  addActivity(`▶ Uninstalling dsh (${dir})…`)
+  try {
+    fs.rmSync(dir, { recursive: true, force: true })
+    addActivity('✓ dsh uninstalled')
+  } catch (error) {
+    addActivity(`✗ uninstall failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  detectionCache = undefined
+  updateCache = undefined
 }
 
 let detectionCache: { node: ConditionState; dsh: DshDetection; at: number } | undefined

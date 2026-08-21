@@ -142,6 +142,15 @@ export function dshInstallDir(
   return path.join(base, 'dsh-launcher-panel', 'install')
 }
 
+/** The launcher's managed source checkout dir (where dsh is cloned for source mode). */
+export function managedSourceDir(
+  platform: NodeJS.Platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+  home: string = os.homedir(),
+): string {
+  return path.join(path.dirname(dshInstallDir(platform, env, home)), 'source')
+}
+
 /** The installed @deepseek-ai/dsh version under a managed install dir (undefined when absent). */
 export function installedDshVersion(installDir: string): string | undefined {
   try {

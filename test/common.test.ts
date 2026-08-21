@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { dirname, join } from 'node:path'
+import { dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, managedSourceDir, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('dshVersionAtLeast compares prerelease versions numerically', () => {
   assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)
@@ -74,6 +74,11 @@ test('pnpmSupportsDangerouslyAllowAllBuilds gates on pnpm 10.16+', () => {
   assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('10.15.0'), false)
   assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('9.15.4'), false)
   assert.equal(pnpmSupportsDangerouslyAllowAllBuilds(''), false)
+})
+
+test('managedSourceDir is a sibling of the managed install dir', () => {
+  const install = dshInstallDir('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me')
+  assert.equal(managedSourceDir('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), join(dirname(install), 'source'))
 })
 
 test('installedDshVersion reads the managed install version', () => {
