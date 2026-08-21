@@ -126,7 +126,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .balance-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 4px; padding: 2px 10px; font-size: 11px; font-family: inherit; cursor: pointer; flex: none; }
   .balance-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
   .balance-btn:disabled { opacity: .6; cursor: progress; }
-  .version-row { display: flex; justify-content: flex-end; }
+  .version-row { display: flex; justify-content: flex-end; gap: 8px; }
   .plugin-version { font-size: 10px; color: var(--vscode-descriptionForeground); opacity: .65; }
 </style>
 </head>
