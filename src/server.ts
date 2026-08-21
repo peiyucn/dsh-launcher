@@ -592,14 +592,19 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
-    // Not cloned yet; no path to show until the user picks a location.
-    return { state: 'unknown', source: 'source', path: '' }
+    // Not cloned yet; show the chosen path only once the clone has started
+    // (the dir appears as soon as the user picks a location).
+    const chosen = cfg.path && cfg.path.trim() !== '' ? cfg.path : managedSourceDir()
+    return fs.existsSync(chosen)
+      ? { state: 'unknown', source: 'source', path: chosen }
+      : { state: 'unknown', source: 'source', path: '' }
   }
   if (!(await findPnpm())) return { state: 'missing', source: '', path: '' }
-  // pnpm present: 'ok' only when dsh is already installed; otherwise the
-  // first start will install it (mark 'unknown', version + path stay empty).
-  return pkgInstalledVersion(cfg) !== undefined
-    ? { state: 'ok', source: 'pnpm', path: pkgInstallDir(cfg) }
+  const dir = pkgInstallDir(cfg)
+  // 'ok' once installed; show the path as soon as it exists (install started).
+  if (pkgInstalledVersion(cfg) !== undefined) return { state: 'ok', source: 'pnpm', path: dir }
+  return fs.existsSync(dir)
+    ? { state: 'unknown', source: 'pnpm', path: dir }
     : { state: 'unknown', source: 'pnpm', path: '' }
 }
 
