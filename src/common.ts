@@ -106,6 +106,19 @@ export function runFile(command: string, args: string[], timeoutMs = 0): Promise
   })
 }
 
+/**
+ * Whether a pnpm version (like '11.22.0') supports dlx's --allow-build flag
+ * (pnpm ≥ 10.9, where build scripts are blocked by default and would
+ * otherwise prompt interactively).
+ */
+export function pnpmSupportsAllowBuild(version: string): boolean {
+  const m = /^(\d+)\.(\d+)/.exec(version.trim())
+  if (!m) return false
+  const major = Number(m[1])
+  const minor = Number(m[2])
+  return major > 10 || (major === 10 && minor >= 9)
+}
+
 // --- pnpm dlx cache ---
 
 /**

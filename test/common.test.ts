@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { bestDshVersionInDlxCache, dshVersionAtLeast, isProcessAlive, maskPath, pnpmCacheRoot, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { bestDshVersionInDlxCache, dshVersionAtLeast, isProcessAlive, maskPath, pnpmCacheRoot, pnpmSupportsAllowBuild, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('dshVersionAtLeast compares prerelease versions numerically', () => {
   assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)
@@ -67,6 +67,15 @@ test('pnpmCacheRoot uses LOCALAPPDATA on win32', (t) => {
   }
   assert.equal(pnpmCacheRoot('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), 'C:\\Users\\me\\AppData\\Local\\pnpm-cache')
   assert.equal(pnpmCacheRoot('win32', {}, 'C:\\Users\\me'), 'C:\\Users\\me\\AppData\\Local\\pnpm-cache')
+})
+
+test('pnpmSupportsAllowBuild gates on pnpm 10.9+', () => {
+  assert.equal(pnpmSupportsAllowBuild('11.22.0'), true)
+  assert.equal(pnpmSupportsAllowBuild('10.16.0'), true)
+  assert.equal(pnpmSupportsAllowBuild('10.9.0'), true)
+  assert.equal(pnpmSupportsAllowBuild('10.8.2'), false)
+  assert.equal(pnpmSupportsAllowBuild('9.15.4'), false)
+  assert.equal(pnpmSupportsAllowBuild(''), false)
 })
 
 test('windowsPnpmCandidates lists the npm-global and pnpm shims', () => {

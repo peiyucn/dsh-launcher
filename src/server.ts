@@ -24,6 +24,7 @@ import {
   isProcessAlive,
   maskPath,
   pnpmCacheRoot,
+  pnpmSupportsAllowBuild,
   psQuote,
   quoteCmdArg,
   resolveDshHome,
@@ -335,7 +336,11 @@ async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<
  * Returns the spec to run, or undefined to abort the start.
  */
 async function preparePnpmStart(cfg: DshConfig, pnpmCmd: string): Promise<{ spec: string; version: string } | undefined> {
+  // The registry query can take a few seconds; show it so a slow network
+  // does not look like a frozen Start.
+  addActivity('ℹ Resolving the dsh channel version…', true)
   let version = await latestDshVersion(cfg.channel, pnpmCmd)
+  finishBusy()
   if (!version) version = pnpmCachedDshVersion()
   if (!version) {
     dshState = 'missing'
@@ -354,16 +359,26 @@ async function preparePnpmStart(cfg: DshConfig, pnpmCmd: string): Promise<{ spec
   dshVersion = version
   return { spec: `@deepseek-ai/dsh@${version}`, version }
 }
+/** The pnpm version string ('' on failure). */
+async function pnpmVersion(pnpmCmd: string): Promise<string> {
+  const result = process.platform === 'win32'
+    ? await runFile('cmd', ['/c', pnpmCmd, '--version'], 8_000)
+    : await runFile(pnpmCmd, ['--version'], 8_000)
+  return result.ok ? result.stdout.trim().split(/\r?\n/)[0]?.trim() ?? '' : ''
+}
+
 /**
  * Make sure pnpm is available in pnpm mode: resolve it on PATH (or the known
  * Windows shim locations), and install it via npm when missing. There is no
  * prompt — without pnpm the start cannot proceed, so the console announces
  * the reason and the install begins immediately.
- * Returns the resolved command, or undefined when the start must abort.
+ * Returns the resolved command and whether dlx accepts --allow-build
+ * (build-script approval, which would otherwise prompt interactively), or
+ * undefined when the start must abort.
  */
-async function ensurePnpmAvailable(): Promise<string | undefined> {
+async function ensurePnpmAvailable(): Promise<{ command: string; allowBuild: boolean } | undefined> {
   const found = await findPnpm()
-  if (found) return found
+  if (found) return { command: found, allowBuild: pnpmSupportsAllowBuild(await pnpmVersion(found)) }
   dshState = 'missing'
   addActivity('✗ pnpm not found — installing it now (npm install -g pnpm)')
   // Installing pnpm is part of the start: mark starting so the panel shows a
@@ -385,7 +400,7 @@ async function ensurePnpmAvailable(): Promise<string | undefined> {
   }
   dshState = 'unknown'
   addActivity('✓ pnpm installed')
-  return after
+  return { command: after, allowBuild: pnpmSupportsAllowBuild(await pnpmVersion(after)) }
 }
 
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
@@ -711,10 +726,14 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
 }
 
 /** pnpm mode: run the official `pnpm dlx @deepseek-ai/dsh web` command with the resolved version pinned. */
-function spawnPnpm(cfg: DshConfig, pnpmCmd: string, spec: string): void {
+function spawnPnpm(cfg: DshConfig, pnpmCmd: string, spec: string, allowBuild: boolean): void {
   dshState = 'ok'
   addActivity('✓ dsh detected (pnpm dlx run)')
   const webArgs = buildWebArgs(cfg)
+  // pnpm ≥ 10.9 blocks dependency build scripts (node-pty, koffi, …) and
+  // would prompt interactively — approve all builds non-interactively, since
+  // the hidden console has no stdin to answer with.
+  const dlxArgs = allowBuild ? ['dlx', '--allow-build=**', spec, ...webArgs] : ['dlx', spec, ...webArgs]
   addActivity(`▶ Start: pnpm dlx ${spec} ${webArgs.join(' ')}`, true)
   if (process.platform === 'win32') {
     // pnpm is a .cmd shim: drive it through cmd with the arguments array, so
@@ -722,9 +741,9 @@ function spawnPnpm(cfg: DshConfig, pnpmCmd: string, spec: string): void {
     // intact in both the hidden-console and the visible-console spawn paths.
     // pnpm prints per-package download progress, so a long install stays
     // visible in the console instead of looking frozen.
-    spawnServer('cmd', ['/c', pnpmCmd, 'dlx', spec, ...webArgs], undefined, false)
+    spawnServer('cmd', ['/c', pnpmCmd, ...dlxArgs], undefined, false)
   } else {
-    spawnServer(pnpmCmd, ['dlx', spec, ...webArgs], undefined, false)
+    spawnServer(pnpmCmd, dlxArgs, undefined, false)
   }
 }
 
@@ -804,7 +823,12 @@ async function ensureCheckoutReady(checkout: string): Promise<boolean> {
     'Setup now',
     'Cancel',
   )
-  if (pick !== 'Setup now') return false
+  if (pick !== 'Setup now') {
+    // The setup prompt was dismissed: say so in the console instead of
+    // silently stopping after "Node.js detected".
+    addActivity('✗ Setup declined — the checkout needs pnpm install + build before dsh can start')
+    return false
+  }
   // Setup is part of the start: mark starting so the panel shows a spinner and
   // disables the Start button (otherwise a slow install looks clickable again).
   starting = true
@@ -882,9 +906,9 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   // pnpm mode: the official `pnpm dlx @deepseek-ai/dsh web` method (source needs explicit opt-in)
   const pnpmCmd = await ensurePnpmAvailable()
   if (!pnpmCmd) return false
-  const run = await preparePnpmStart(cfg, pnpmCmd)
+  const run = await preparePnpmStart(cfg, pnpmCmd.command)
   if (!run) return false
-  spawnPnpm(cfg, pnpmCmd, run.spec)
+  spawnPnpm(cfg, pnpmCmd.command, run.spec, pnpmCmd.allowBuild)
   return waitForPort(cfg)
 }
 
