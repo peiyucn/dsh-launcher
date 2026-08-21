@@ -152,7 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="runtime-label">dsh</span>
         <span class="runtime-value" id="dshVersion">—</span>
         <button class="mini-btn" id="updateBtn" title="Update dsh" style="display:none">Update</button>
-        <button class="mini-btn" id="refreshBtn" title="Check for dsh updates">Check updates</button>
+        <button class="icon-btn" id="refreshBtn" title="Check for dsh updates">↓</button>
       </div>
     </div>
     <div class="runtime-section">
@@ -290,12 +290,12 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         updateBtn.style.display = 'none'
       }
 
-      // Check updates button mirrors Start: disabled + "Checking…" while the
-      // server-side check is in flight, re-enabled by the next status update.
+      // Check updates button mirrors Start: disabled while the server-side
+      // check is in flight, re-enabled by the next status update.
       const checkBtn = document.getElementById('refreshBtn')
       if (checkBtn) {
         checkBtn.disabled = !!status.checking
-        checkBtn.textContent = status.checking ? 'Checking…' : 'Check updates'
+        checkBtn.textContent = status.checking ? '…' : '↓'
       }
 
       // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
@@ -422,7 +422,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const btn = document.getElementById('refreshBtn')
       if (btn.disabled) return
       btn.disabled = true
-      btn.textContent = 'Checking…'
+      btn.textContent = '…'
       vscode.postMessage({ command: 'refreshRequirements' })
       // Re-enabled by renderRuntime once status.checking goes false (same as Start).
     })
