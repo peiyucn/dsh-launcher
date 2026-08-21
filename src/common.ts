@@ -151,6 +151,15 @@ export function managedSourceDir(
   return path.join(path.dirname(dshInstallDir(platform, env, home)), 'source')
 }
 
+/** The launcher's log dir (client.log / server.log), alongside install and source. */
+export function dshLogDir(
+  platform: NodeJS.Platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+  home: string = os.homedir(),
+): string {
+  return path.join(path.dirname(dshInstallDir(platform, env, home)), 'logs')
+}
+
 /** The installed @deepseek-ai/dsh version under a managed install dir (undefined when absent). */
 export function installedDshVersion(installDir: string): string | undefined {
   try {

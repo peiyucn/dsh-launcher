@@ -4,18 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.6]
 
-- The panel no longer shows the Node version (Node is checked only at Start, with console guidance to install it); the refresh button moved next to the dsh version and the ✓/✗ marks are gone.
-- Uninstall is now interactive: it asks to stop-and-uninstall when running, or to confirm when stopped.
-- On the first pkg/source install with no location configured, the user can pick the default or a custom folder (dsh.pkgPath / dsh.path).
-- The DeepSeek API Status card shows model names without the trailing "api".
-- Source mode now clones deepseek-harness automatically into a managed location (dsh.path is an optional override), so only Node.js needs to be pre-installed.
-- The panel now shows node / dsh / install / data together at the top (the separate Requirements card is gone); the dsh row has Update and 🗑 (uninstall) buttons, and update works for both modes (pkg reinstalls, source pulls). The `path` label was renamed to `install`.
-- pkg run mode (default) now installs dsh into a launcher-managed directory (`%LOCALAPPDATA%\dsh-launcher-panel\install`) via `pnpm install` and runs it with `pnpm exec dsh web` — no user-configured path, no per-start re-download, and no interactive prompts (dependency build scripts are approved non-interactively on pnpm ≥ 10.16, the same thing npm does by default). The previous npx-based mode was dropped because npm's peer resolver hangs on dsh's dependency graph.
-- The pnpm/source mode toggle now uses a compact horizontal pill with short labels (`pkg` / `src`).
-- When pnpm is missing, Start logs it in the console and installs pnpm automatically without prompting (`npm install -g pnpm` in a visible terminal), then continues the start; detection also checks the Windows npm-global and pnpm standalone shim locations.
-- Fixed: source-mode setup (`pnpm install` + build) now counts as "starting" — the panel shows progress and the Start button stays disabled instead of looking clickable mid-build.
-- Fixed: Stop pressed during setup is honoured — no server is started afterwards (with an accurate "Setup interrupted" message).
-- Tests are now TypeScript (run via tsx against the source directly); the repository no longer contains JavaScript.
+- pkg run mode (default) installs dsh into a launcher-managed directory via `pnpm install` and runs `pnpm exec dsh web`, approving build scripts non-interactively (the same thing npm does by default). npx was dropped because npm's peer resolver hangs on dsh's dependency graph.
+- Source mode clones deepseek-harness automatically into a managed directory (`dsh.path` is an optional override) and runs it via tsx.
+- On the first install with no location configured, the user can pick the default or a custom folder (`dsh.pkgPath` / `dsh.path`); the install path is only shown once a location is chosen.
+- The panel shows status + dsh version (with Update and Check update buttons) + install + data together at the top (the separate Requirements card is gone); node and launcher versions sit at the bottom.
+- The Start button reads "Install & Start" when dsh isn't installed yet.
+- Update is unified across modes (pkg reinstalls the latest, source pulls the checkout).
+- Log files live in `%LOCALAPPDATA%\dsh-launcher-panel\logs` alongside the managed install/source dirs (previously under %TEMP%).
+- When pnpm is missing, Start installs it automatically without prompting; the DeepSeek API Status card shows model names without the trailing "api".
+- Fixed: source-mode setup counts as "starting"; Stop during setup is honoured; `--no-open` is decided from the exact version being run.
+- Tests are TypeScript (run via tsx against the source directly).
 
 ## [0.1.5]
 

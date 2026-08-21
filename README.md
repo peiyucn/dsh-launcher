@@ -53,7 +53,7 @@ Settings → search "dsh":
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **API Status** card supports DeepSeek only for now — it only shows when a DeepSeek model is configured in dsh.
-* Log files: `%TEMP%\dsh-launcher-panel\client.log` (launcher activity) and `%TEMP%\dsh-launcher-panel\server.log` (server output); both are clickable in the panel.
+* Log files: `%LOCALAPPDATA%\dsh-launcher-panel\logs\client.log` (launcher activity) and `server.log` (server output), alongside the managed install/source dirs; both are clickable in the panel.
 * DSH cannot run "minimal mode" properly on Windows for now.
 
 ## Environment

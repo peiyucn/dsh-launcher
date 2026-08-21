@@ -567,15 +567,15 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
-    // Not cloned yet, but Start will clone it; report where it will live.
-    return { state: 'unknown', source: 'source', path: managedSourceDir() }
+    // Not cloned yet; no path to show until the user picks a location.
+    return { state: 'unknown', source: 'source', path: '' }
   }
   if (!(await findPnpm())) return { state: 'missing', source: '', path: '' }
   // pnpm present: 'ok' only when dsh is already installed; otherwise the
-  // first start will install it, so mark it 'unknown' (version stays empty).
+  // first start will install it (mark 'unknown', version + path stay empty).
   return pkgInstalledVersion(cfg) !== undefined
     ? { state: 'ok', source: 'pnpm', path: pkgInstallDir(cfg) }
-    : { state: 'unknown', source: 'pnpm', path: pkgInstallDir(cfg) }
+    : { state: 'unknown', source: 'pnpm', path: '' }
 }
 
 /** Run a command in a visible VS Code terminal (used for updates). */
@@ -1160,40 +1160,6 @@ export async function runDshUpdate(): Promise<void> {
   const ok = await runInTerminal('Update DeepSeek Harness', `git -C "${checkout}" pull`)
   addActivity(ok ? '↑ dsh updated' : '↑ dsh update failed')
   if (ok) updateCache = undefined
-}
-
-/** Uninstall dsh for the current mode: delete the managed install or the source checkout. */
-export async function runDshUninstall(): Promise<void> {
-  const cfg = readConfig()
-  const dir = cfg.mode === 'source' ? findSourceCheckout(cfg) : pkgInstallDir(cfg)
-  if (!dir) {
-    addActivity('⚠ Nothing to uninstall')
-    return
-  }
-  const running = await isPortOpen(LOOPBACK_HOST, cfg.port)
-  const pick = await vscode.window.showWarningMessage(
-    running
-      ? 'The server is running. Stop it and uninstall dsh?'
-      : `Uninstall dsh (delete ${dir})?`,
-    running ? 'Stop & uninstall' : 'Uninstall',
-  )
-  if (pick !== (running ? 'Stop & uninstall' : 'Uninstall')) return
-  if (running) await stopServer()
-  addActivity(`▶ Uninstalling dsh (${dir})…`)
-  try {
-    fs.rmSync(dir, { recursive: true, force: true })
-    // force:true ignores errors (locked files), so verify the dir is actually gone.
-    if (fs.existsSync(dir)) {
-      addActivity('⚠ dsh uninstall incomplete — some files are locked. Restart VS Code and try again, or delete the folder manually.')
-      void vscode.window.showWarningMessage(`DeepSeek Harness: could not fully remove ${dir} (files in use). Restart VS Code and try again.`)
-    } else {
-      addActivity('✓ dsh uninstalled')
-    }
-  } catch (error) {
-    addActivity(`✗ uninstall failed: ${error instanceof Error ? error.message : String(error)}`)
-  }
-  detectionCache = undefined
-  updateCache = undefined
 }
 
 let detectionCache: { node: ConditionState; dsh: DshDetection; at: number } | undefined

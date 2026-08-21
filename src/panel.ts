@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, readConfig, runDshUninstall, runDshUpdate, type ServerStatus } from './server'
+import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, readConfig, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -152,8 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="runtime-label">dsh</span>
         <span class="runtime-value" id="dshVersion">—</span>
         <button class="mini-btn" id="updateBtn" title="Update dsh" style="display:none">Update</button>
-        <button class="icon-btn" id="refreshBtn" title="Re-check for updates">⟳</button>
-        <button class="icon-btn" id="uninstallBtn" title="Uninstall dsh (delete the install / source checkout)">🗑</button>
+        <button class="mini-btn" id="refreshBtn" title="Check for dsh updates">Check update</button>
       </div>
     </div>
     <div class="runtime-section">
@@ -211,7 +210,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
   <div class="version-row">
-    <span class="plugin-version" id="pluginVersion">v${this.version}</span>
+    <span class="plugin-version" id="nodeVersionFooter">node —</span>
+    <span class="plugin-version" id="pluginVersion">launcher v${this.version}</span>
   </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi()
@@ -267,7 +267,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         dot.className = 'dot' + (running ? ' running' : '')
         statusText.textContent = running ? 'Running' : 'Stopped'
         statusSub.textContent = running ? (status.url || '') : ''
-        startBtn.textContent = running ? '↗ New Tab' : '▶ Start'
+        startBtn.textContent = running ? '↗ New Tab' : (status.dshVersion ? '▶ Start' : 'Install & Start')
       }
       const mode = status.mode === 'source' ? 'source' : 'pnpm'
       document.querySelectorAll('.mode-option').forEach((b) => {
@@ -296,6 +296,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const runtimeData = document.getElementById('runtimeData')
       runtimeData.textContent = status.dshHomeShort || '—'
       runtimeData.title = status.dshHome || ''
+
+      // node + launcher versions live at the very bottom.
+      document.getElementById('nodeVersionFooter').textContent = status.nodeVersion ? ('node v' + status.nodeVersion) : 'node —'
     }
 
     function renderLogFiles(status) {
@@ -379,7 +382,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       })
     })
     document.getElementById('updateBtn').addEventListener('click', () => vscode.postMessage({ command: 'updateDsh' }))
-    document.getElementById('uninstallBtn').addEventListener('click', () => vscode.postMessage({ command: 'uninstallDsh' }))
     document.getElementById('dsOpenBtn').addEventListener('click', () => vscode.postMessage({ command: 'openStatus' }))
     document.getElementById('settingsBtn').addEventListener('click', () => vscode.postMessage({ command: 'openSettings' }))
     document.getElementById('clearConsoleBtn').addEventListener('click', () => vscode.postMessage({ command: 'clearConsole' }))
@@ -508,19 +510,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       case 'updateDsh':
         await runDshUpdate()
         break
-      case 'uninstallDsh':
-        await runDshUninstall()
-        break
       case 'refreshRequirements':
-        addActivity('↻ Re-checking requirements…', true)
+        addActivity('↻ Checking for updates…', true)
         await this.refresh()
         await clearRequirementsCaches()
         {
           const st = await currentStatus()
-          const node = st.node === 'ok' ? 'v' + st.nodeVersion : 'missing'
-          const dsh = st.dsh === 'ok' ? 'v' + st.dshVersion : st.dsh === 'missing' ? 'missing' : 'not installed'
-          const upd = st.update && st.update.hasUpdate ? ' · update → ' + st.update.label : ''
-          addActivity(`✓ Re-checked: Node ${node} · DSH ${dsh}${upd}`)
+          addActivity(st.update && st.update.hasUpdate ? `✓ Update available → ${st.update.label}` : '✓ dsh is up to date')
         }
         finishBusy()
         break
