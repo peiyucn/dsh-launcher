@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.6]
 
+- Start now pins the resolved channel version into the dlx spec (`pnpm dlx @deepseek-ai/dsh@<version>`), so pnpm installs the latest release instead of silently reusing a stale cached one; when the registry is unreachable it falls back to the best cached version.
 - When pnpm is missing, Start now logs it in the console and installs pnpm automatically without prompting (`npm install -g pnpm` in a visible terminal), then continues the start; detection also checks the Windows npm-global and pnpm standalone shim locations.
 - Replaced the npx run mode with pnpm: `pnpm` (default) runs `pnpm dlx @deepseek-ai/dsh web`, because npm's peer resolver can hang indefinitely on dsh's dependency graph while pnpm is the tool the dsh repo itself uses. `dsh.mode` is now `pnpm` / `source`, and the panel offers clear guidance when pnpm is missing.
 - Fixed: source-mode setup (`pnpm install` + build) now counts as "starting" — the panel shows progress and the Start button stays disabled instead of looking clickable mid-build.

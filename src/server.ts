@@ -321,30 +321,32 @@ async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<
   return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
 }
 
-/** Prepare the pnpm start: verify the registry when a download is required, and announce installs. Returns false to abort. */
-async function preparePnpmInstall(cfg: DshConfig, pnpmCmd = 'pnpm'): Promise<boolean> {
+/**
+ * Prepare the pnpm start: resolve the dsh version to run for the channel and
+ * announce installs. The version is pinned into the dlx spec, so a new
+ * release changes the spec and pnpm installs it instead of silently reusing
+ * a stale cached install. Offline, the best cached version is used instead.
+ * Returns the spec to run, or undefined to abort the start.
+ */
+async function preparePnpmStart(cfg: DshConfig, pnpmCmd: string): Promise<{ spec: string; version: string } | undefined> {
+  let version = await latestDshVersion(cfg.channel, pnpmCmd)
+  if (!version) version = pnpmCachedDshVersion()
+  if (!version) {
+    dshState = 'missing'
+    addActivity('✗ dsh is not installed and the registry is unreachable — check your network and try again')
+    void vscode.window.showErrorMessage('DeepSeek Harness: unable to reach the registry to install dsh. Check your network connection.')
+    return undefined
+  }
   const cached = pnpmCachedDshVersion()
   if (cached === undefined) {
-    // Nothing cached: pnpm must download dsh, so verify the registry is
-    // reachable first; a network outage should fail fast, not hang the start.
-    const latest = await latestDshVersion(cfg.channel, pnpmCmd)
-    if (!latest) {
-      dshState = 'missing'
-      addActivity('✗ dsh is not installed and the registry is unreachable — check your network and try again')
-      void vscode.window.showErrorMessage('DeepSeek Harness: unable to reach the registry to install dsh. Check your network connection.')
-      return false
-    }
-    addActivity(`ℹ dsh v${latest} — pnpm will install it on first run; this can take a while, please wait`)
-    return true
+    addActivity(`ℹ dsh v${version} — pnpm will install it on first run; this can take a while, please wait`)
+  } else if (cached !== version) {
+    addActivity(`ℹ dsh v${version} will run (cached: v${cached}) — pnpm will install it first; this can take a while`)
   }
-  // Cached: optionally announce an upgrade (best-effort, non-blocking).
-  void (async () => {
-    const latest = await latestDshVersion(cfg.channel, pnpmCmd)
-    if (latest && latest !== cached) {
-      addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — pnpm will update it before starting; this can take a while`)
-    }
-  })()
-  return true
+  // The panel shows the version that is about to run (buildWebArgs also reads
+  // this to decide --no-open).
+  dshVersion = version
+  return { spec: `@deepseek-ai/dsh@${version}`, version }
 }
 /**
  * Make sure pnpm is available in pnpm mode: resolve it on PATH (or the known
@@ -681,13 +683,12 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
 
 /**
  * The `web` command tail: the port, plus `--no-open` when dsh ≥ rc.8 would
- * open the system browser on its own. `knownNew` covers the `next` channel,
- * where the cached version under-reports the version that will actually run
- * on a first install.
+ * open the system browser on its own. `dshVersion` is the version about to
+ * run (the pinned channel version, or the source checkout's version).
  */
-function buildWebArgs(cfg: DshConfig, knownNew = false): string[] {
+function buildWebArgs(cfg: DshConfig): string[] {
   const args = ['web', '--port', String(cfg.port)]
-  if (knownNew || (dshVersion && dshVersionAtLeast(dshVersion, DSH_NO_OPEN_MIN_VERSION))) args.push('--no-open')
+  if (dshVersion && dshVersionAtLeast(dshVersion, DSH_NO_OPEN_MIN_VERSION)) args.push('--no-open')
   return args
 }
 
@@ -703,12 +704,11 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', ...webArgs], repoPath, false, env)
 }
 
-/** pnpm mode: run the official `pnpm dlx @deepseek-ai/dsh web` command (per the chosen channel). */
-function spawnPnpm(cfg: DshConfig, pnpmCmd: string): void {
+/** pnpm mode: run the official `pnpm dlx @deepseek-ai/dsh web` command with the resolved version pinned. */
+function spawnPnpm(cfg: DshConfig, pnpmCmd: string, spec: string): void {
   dshState = 'ok'
   addActivity('✓ dsh detected (pnpm dlx run)')
-  const spec = cfg.channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
-  const webArgs = buildWebArgs(cfg, cfg.channel === 'next')
+  const webArgs = buildWebArgs(cfg)
   addActivity(`▶ Start: pnpm dlx ${spec} ${webArgs.join(' ')}`, true)
   // Windows: pnpm is a .cmd shim, so run it through the shell. pnpm prints
   // per-package download progress, so a long install stays visible in the
@@ -871,8 +871,9 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   // pnpm mode: the official `pnpm dlx @deepseek-ai/dsh web` method (source needs explicit opt-in)
   const pnpmCmd = await ensurePnpmAvailable()
   if (!pnpmCmd) return false
-  if (!(await preparePnpmInstall(cfg, pnpmCmd))) return false
-  spawnPnpm(cfg, pnpmCmd)
+  const run = await preparePnpmStart(cfg, pnpmCmd)
+  if (!run) return false
+  spawnPnpm(cfg, pnpmCmd, run.spec)
   return waitForPort(cfg)
 }
 
