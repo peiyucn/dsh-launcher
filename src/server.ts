@@ -328,7 +328,6 @@ function pkgInstalledVersion(cfg: DshConfig): string | undefined {
 async function chooseInstallDir(kind: 'pkg' | 'source', defaultDir: string): Promise<string | undefined> {
   const pick = await vscode.window.showInformationMessage(
     `Install dsh (${kind}) to the default location?`,
-    { modal: true, detail: defaultDir },
     'Use default location',
     'Choose folder…',
   )
@@ -1176,7 +1175,6 @@ export async function runDshUninstall(): Promise<void> {
     running
       ? 'The server is running. Stop it and uninstall dsh?'
       : `Uninstall dsh (delete ${dir})?`,
-    { modal: true },
     running ? 'Stop & uninstall' : 'Uninstall',
   )
   if (pick !== (running ? 'Stop & uninstall' : 'Uninstall')) return
@@ -1184,7 +1182,13 @@ export async function runDshUninstall(): Promise<void> {
   addActivity(`▶ Uninstalling dsh (${dir})…`)
   try {
     fs.rmSync(dir, { recursive: true, force: true })
-    addActivity('✓ dsh uninstalled')
+    // force:true ignores errors (locked files), so verify the dir is actually gone.
+    if (fs.existsSync(dir)) {
+      addActivity('⚠ dsh uninstall incomplete — some files are locked. Restart VS Code and try again, or delete the folder manually.')
+      void vscode.window.showWarningMessage(`DeepSeek Harness: could not fully remove ${dir} (files in use). Restart VS Code and try again.`)
+    } else {
+      addActivity('✓ dsh uninstalled')
+    }
   } catch (error) {
     addActivity(`✗ uninstall failed: ${error instanceof Error ? error.message : String(error)}`)
   }
