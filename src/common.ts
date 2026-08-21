@@ -159,6 +159,32 @@ export function bestDshVersionInDlxCache(dlxRoot: string): string | undefined {
   return best
 }
 
+/** Candidate pnpm.cmd shim locations on Windows (npm global bin, pnpm standalone installer). */
+export function windowsPnpmCandidates(env: Record<string, string | undefined>): string[] {
+  const out: string[] = []
+  if (env.APPDATA) out.push(path.join(env.APPDATA, 'npm', 'pnpm.cmd'))
+  if (env.LOCALAPPDATA) out.push(path.join(env.LOCALAPPDATA, 'pnpm', 'pnpm.cmd'))
+  return out
+}
+
+/**
+ * Resolve the pnpm command: PATH first (bare `pnpm` on Windows, so cmd's
+ * PATHEXT picks pnpm.cmd), then the known Windows shim locations.
+ */
+export async function findPnpm(): Promise<string | undefined> {
+  const onPath = await findOnPath('pnpm')
+  if (onPath) return process.platform === 'win32' ? 'pnpm' : onPath
+  if (process.platform !== 'win32') return undefined
+  for (const candidate of windowsPnpmCandidates(process.env)) {
+    try {
+      if (fs.existsSync(candidate)) return candidate
+    } catch {
+      // unreadable location
+    }
+  }
+  return undefined
+}
+
 /** Resolve a command on PATH (returns the first match, or undefined). */
 export async function findOnPath(cmd: string): Promise<string | undefined> {
   const which = process.platform === 'win32' ? 'where' : 'which'

@@ -57,7 +57,7 @@
 ## 环境
 
 * **Node.js** — 22.19+（或 >= 24）
-* **pnpm** — 默认 pnpm 模式需要（用 `npm install -g pnpm` 安装）
+* **pnpm** — 默认 pnpm 模式需要；未安装时，扩展会在首次启动时询问并帮你安装（`npm install -g pnpm`）
 * **VS Code** — 1.85+
 * **PowerShell 7** — 可选；Windows 下推荐安装
 

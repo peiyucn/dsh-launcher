@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { bestDshVersionInDlxCache, dshVersionAtLeast, isProcessAlive, maskPath, pnpmCacheRoot, psQuote, quoteCmdArg, resolveDshHome, toEnglish } from '../src/common.ts'
+import { bestDshVersionInDlxCache, dshVersionAtLeast, isProcessAlive, maskPath, pnpmCacheRoot, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('dshVersionAtLeast compares prerelease versions numerically', () => {
   assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)
@@ -67,6 +67,15 @@ test('pnpmCacheRoot uses LOCALAPPDATA on win32', (t) => {
   }
   assert.equal(pnpmCacheRoot('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), 'C:\\Users\\me\\AppData\\Local\\pnpm-cache')
   assert.equal(pnpmCacheRoot('win32', {}, 'C:\\Users\\me'), 'C:\\Users\\me\\AppData\\Local\\pnpm-cache')
+})
+
+test('windowsPnpmCandidates lists the npm-global and pnpm shims', () => {
+  const out = windowsPnpmCandidates({ APPDATA: 'C:\\Users\\me\\AppData\\Roaming', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' })
+  assert.deepEqual(out, [
+    join('C:\\Users\\me\\AppData\\Roaming', 'npm', 'pnpm.cmd'),
+    join('C:\\Users\\me\\AppData\\Local', 'pnpm', 'pnpm.cmd'),
+  ])
+  assert.deepEqual(windowsPnpmCandidates({}), [])
 })
 
 test('bestDshVersionInDlxCache scans dlx slots and picks the newest dsh', () => {

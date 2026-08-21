@@ -20,7 +20,7 @@ import {
   STOP_POLL_PROBE_MS,
   bestDshVersionInDlxCache,
   dshVersionAtLeast,
-  findOnPath,
+  findPnpm,
   isProcessAlive,
   maskPath,
   pnpmCacheRoot,
@@ -312,22 +312,22 @@ function pnpmCachedDshVersion(): string | undefined {
 }
 
 /** Resolve the published @deepseek-ai/dsh version for a channel (undefined on failure). */
-async function latestDshVersion(channel: DshChannel): Promise<string | undefined> {
+async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<string | undefined> {
   const spec = channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', 'pnpm', 'view', spec, 'version'], 10_000)
-    : await runFile('pnpm', ['view', spec, 'version'], 10_000)
+    ? await runFile('cmd', ['/d', '/s', '/c', `"${quoteCmdArg(pnpmCmd)} view ${spec} version"`], 10_000)
+    : await runFile(pnpmCmd, ['view', spec, 'version'], 10_000)
   if (!result.ok) return undefined
   return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
 }
 
 /** Prepare the pnpm start: verify the registry when a download is required, and announce installs. Returns false to abort. */
-async function preparePnpmInstall(cfg: DshConfig): Promise<boolean> {
+async function preparePnpmInstall(cfg: DshConfig, pnpmCmd = 'pnpm'): Promise<boolean> {
   const cached = pnpmCachedDshVersion()
   if (cached === undefined) {
     // Nothing cached: pnpm must download dsh, so verify the registry is
     // reachable first; a network outage should fail fast, not hang the start.
-    const latest = await latestDshVersion(cfg.channel)
+    const latest = await latestDshVersion(cfg.channel, pnpmCmd)
     if (!latest) {
       dshState = 'missing'
       addActivity('✗ dsh is not installed and the registry is unreachable — check your network and try again')
@@ -339,13 +339,51 @@ async function preparePnpmInstall(cfg: DshConfig): Promise<boolean> {
   }
   // Cached: optionally announce an upgrade (best-effort, non-blocking).
   void (async () => {
-    const latest = await latestDshVersion(cfg.channel)
+    const latest = await latestDshVersion(cfg.channel, pnpmCmd)
     if (latest && latest !== cached) {
       addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — pnpm will update it before starting; this can take a while`)
     }
   })()
   return true
 }
+/**
+ * Make sure pnpm is available in pnpm mode: resolve it on PATH (or the known
+ * Windows shim locations), and offer to install it via npm when missing.
+ * Returns the resolved command, or undefined when the start must abort.
+ */
+async function ensurePnpmAvailable(): Promise<string | undefined> {
+  const found = await findPnpm()
+  if (found) return found
+  dshState = 'missing'
+  addActivity('✗ pnpm not found — DeepSeek Harness starts with pnpm')
+  const pick = await vscode.window.showInformationMessage(
+    'DeepSeek Harness runs dsh with pnpm, which is not installed on this machine. Install it now (npm install -g pnpm)?',
+    'Install pnpm',
+    'Cancel',
+  )
+  if (pick !== 'Install pnpm') return undefined
+  // Installing pnpm is part of the start: mark starting so the panel shows a
+  // spinner and the Start button stays disabled while npm works.
+  starting = true
+  addActivity('▶ Installing pnpm (npm install -g pnpm)…')
+  const ok = await runInTerminal('Install pnpm', 'npm install -g pnpm')
+  starting = false
+  if (!ok) {
+    addActivity('✗ pnpm install failed — run `npm install -g pnpm` in a terminal, then try again')
+    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Run "npm install -g pnpm" in a terminal, then try again.')
+    return undefined
+  }
+  const after = await findPnpm()
+  if (!after) {
+    addActivity('✗ pnpm installed but not on PATH — restart VS Code, then try again')
+    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm was installed but is not on PATH yet. Restart VS Code, then try again.')
+    return undefined
+  }
+  dshState = 'unknown'
+  addActivity('✓ pnpm installed')
+  return after
+}
+
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
 function isDshCheckout(dir: string | undefined): boolean {
   if (!dir) return false
@@ -430,7 +468,7 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
     return { state: 'missing', source: '', path: '' }
   }
-  if (!(await findOnPath('pnpm'))) return { state: 'missing', source: '', path: '' }
+  if (!(await findPnpm())) return { state: 'missing', source: '', path: '' }
   // pnpm present: 'ok' only when dsh is already cached; otherwise the first
   // start will download it, so mark it 'unknown' (version stays empty).
   return pnpmCachedDshVersion() !== undefined
@@ -670,7 +708,7 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
 }
 
 /** pnpm mode: run the official `pnpm dlx @deepseek-ai/dsh web` command (per the chosen channel). */
-function spawnPnpm(cfg: DshConfig): void {
+function spawnPnpm(cfg: DshConfig, pnpmCmd: string): void {
   dshState = 'ok'
   addActivity('✓ dsh detected (pnpm dlx run)')
   const spec = cfg.channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
@@ -679,7 +717,8 @@ function spawnPnpm(cfg: DshConfig): void {
   // Windows: pnpm is a .cmd shim, so run it through the shell. pnpm prints
   // per-package download progress, so a long install stays visible in the
   // console instead of looking frozen.
-  spawnServer('pnpm', ['dlx', spec, ...webArgs], undefined, process.platform === 'win32')
+  const cmd = process.platform === 'win32' ? quoteCmdArg(pnpmCmd) : pnpmCmd
+  spawnServer(cmd, ['dlx', spec, ...webArgs], undefined, process.platform === 'win32')
 }
 
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
@@ -834,14 +873,10 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   }
 
   // pnpm mode: the official `pnpm dlx @deepseek-ai/dsh web` method (source needs explicit opt-in)
-  if (!(await findOnPath('pnpm'))) {
-    dshState = 'missing'
-    addActivity('✗ pnpm not found — install it with `npm install -g pnpm`, then restart VS Code')
-    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm is not installed. Run "npm install -g pnpm" in a terminal, then restart VS Code.')
-    return false
-  }
-  if (!(await preparePnpmInstall(cfg))) return false
-  spawnPnpm(cfg)
+  const pnpmCmd = await ensurePnpmAvailable()
+  if (!pnpmCmd) return false
+  if (!(await preparePnpmInstall(cfg, pnpmCmd))) return false
+  spawnPnpm(cfg, pnpmCmd)
   return waitForPort(cfg)
 }
 
