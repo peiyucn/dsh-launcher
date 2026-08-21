@@ -3,7 +3,20 @@ import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, managedSourceDir, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { canTransition, dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, managedSourceDir, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+
+test('canTransition allows only valid server phase transitions', () => {
+  assert.equal(canTransition('stopped', 'starting'), true)
+  assert.equal(canTransition('starting', 'running'), true)
+  assert.equal(canTransition('starting', 'stopping'), true)
+  assert.equal(canTransition('starting', 'stopped'), true)
+  assert.equal(canTransition('running', 'stopping'), true)
+  assert.equal(canTransition('stopping', 'stopped'), true)
+  assert.equal(canTransition('stopped', 'running'), false)
+  assert.equal(canTransition('running', 'starting'), false)
+  assert.equal(canTransition('running', 'stopped'), false)
+  assert.equal(canTransition('stopped', 'stopping'), false)
+})
 
 test('dshVersionAtLeast compares prerelease versions numerically', () => {
   assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)

@@ -11,6 +11,24 @@ export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
 /** dsh ≥ this version opens the system browser on its own; the launcher then passes `--no-open`. */
 export const DSH_NO_OPEN_MIN_VERSION = '0.1.0-rc.8'
 
+// --- server lifecycle state machine ---
+
+/** The dsh server lifecycle phase (the launcher's own view of it). */
+export type ServerPhase = 'stopped' | 'starting' | 'running' | 'stopping'
+
+/** Valid direct transitions between server lifecycle phases. */
+const SERVER_PHASE_TRANSITIONS: Record<ServerPhase, ServerPhase[]> = {
+  stopped: ['starting'],
+  starting: ['running', 'stopping', 'stopped'],
+  running: ['stopping'],
+  stopping: ['stopped'],
+}
+
+/** Whether a transition from → to is allowed. */
+export function canTransition(from: ServerPhase, to: ServerPhase): boolean {
+  return SERVER_PHASE_TRANSITIONS[from].includes(to)
+}
+
 // --- Timing (ms) ---
 
 export const PORT_PROBE_TIMEOUT_MS = 500
