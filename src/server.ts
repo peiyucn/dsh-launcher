@@ -742,32 +742,33 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
 
 /**
  * The `web` command tail: the port, plus `--no-open` when dsh ≥ rc.8 would
- * open the system browser on its own. `dshVersion` is the version about to
- * run (the pinned channel version, or the source checkout's version).
+ * open the system browser on its own. `version` is the exact version about
+ * to run — passed explicitly because the `dshVersion` global is recomputed
+ * by status refreshes and can be empty mid-install.
  */
-function buildWebArgs(cfg: DshConfig): string[] {
+function buildWebArgs(cfg: DshConfig, version: string): string[] {
   const args = ['web', '--port', String(cfg.port)]
-  if (dshVersion && dshVersionAtLeast(dshVersion, DSH_NO_OPEN_MIN_VERSION)) args.push('--no-open')
+  if (version && dshVersionAtLeast(version, DSH_NO_OPEN_MIN_VERSION)) args.push('--no-open')
   return args
 }
 
 /** Source mode: run a checkout via `node --import tsx/esm apps/cli/src/bin.ts web`. */
-function spawnSource(repoPath: string, cfg: DshConfig): void {
+function spawnSource(repoPath: string, cfg: DshConfig, version: string): void {
   const node = cfg.nodePath || 'node'
   dshState = 'ok'
   addActivity('✓ dsh detected (source run)')
   addActivity('ℹ Source mode compiles TypeScript on the fly with tsx — the first start is slower, please wait')
-  const webArgs = buildWebArgs(cfg)
+  const webArgs = buildWebArgs(cfg, version)
   addActivity(`▶ Start: ${node} --import tsx/esm apps/cli/src/bin.ts ${webArgs.join(' ')}`, true)
   const env = cfg.sourceDebug ? { NODE_DEBUG: 'module' } : undefined
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', ...webArgs], repoPath, false, env)
 }
 
 /** pkg mode: run the managed dsh via `pnpm exec dsh web` (pnpm sets up the module path). */
-function spawnPkg(cfg: DshConfig, pnpmCmd: string): void {
+function spawnPkg(cfg: DshConfig, pnpmCmd: string, version: string): void {
   dshState = 'ok'
   addActivity('✓ dsh detected (pkg run)')
-  const webArgs = buildWebArgs(cfg)
+  const webArgs = buildWebArgs(cfg, version)
   addActivity(`▶ Start: pnpm exec dsh ${webArgs.join(' ')}`, true)
   const dir = managedInstallDir()
   if (process.platform === 'win32') {
@@ -932,7 +933,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
       starting = false
       return false
     }
-    spawnSource(repoPath, cfg)
+    spawnSource(repoPath, cfg, dshVersion)
     return waitForPort(cfg)
   }
 
@@ -941,7 +942,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   if (!pnpmCmd) return false
   const version = await preparePkgStart(cfg, pnpmCmd.command, pnpmCmd.allowBuild)
   if (!version) return false
-  spawnPkg(cfg, pnpmCmd.command)
+  spawnPkg(cfg, pnpmCmd.command, version)
   return waitForPort(cfg)
 }
 
