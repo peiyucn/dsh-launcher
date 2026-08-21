@@ -894,6 +894,7 @@ function exclusive(task: () => Promise<boolean>): Promise<boolean> {
   if (busy) return busy
   busy = task().finally(() => {
     busy = undefined
+    starting = false
   })
   return busy
 }
@@ -966,6 +967,10 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     addActivity(`✓ Server already running ${uiUrl(cfg)}`)
     return true
   }
+
+  // Mark the start in-flight from the very first await, so status refreshes
+  // keep the Start button grey instead of un-greying it mid-setup.
+  starting = true
 
   await checkNodeOnce()
   if (nodeState === 'missing') {
@@ -1247,6 +1252,11 @@ export async function clearRequirementsCaches(): Promise<void> {
   } finally {
     checkingUpdates = false
   }
+}
+
+/** Mark the update check in-flight before the first refresh, so the button stays grey. */
+export function setCheckingUpdates(value: boolean): void {
+  checkingUpdates = value
 }
 
 /** Clear the console log (in-memory feed and the persisted file). */
