@@ -220,7 +220,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     const LOADING_TIMEOUT_MS = 6000
     const SPIN_INTERVAL_MS = 150
     const ELAPSED_INTERVAL_MS = 1000
+    const CHECK_TICK_MS = 1500
     let gotUpdate = false
+    let wasChecking = false
+    let checkTickUntil = 0
     setTimeout(() => {
       if (!gotUpdate) {
         const st = document.getElementById('statusText')
@@ -295,8 +298,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const checkBtn = document.getElementById('refreshBtn')
       if (checkBtn) {
         checkBtn.disabled = !!status.checking
-        checkBtn.textContent = '⟳'
         checkBtn.classList.toggle('spinning', !!status.checking)
+        checkBtn.textContent = status.checking ? '⟳' : (Date.now() < checkTickUntil ? '✓' : '⟳')
       }
 
       // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
@@ -468,6 +471,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (!m || m.type !== 'update') return
       gotUpdate = true
       document.getElementById('loadingOverlay').classList.add('hidden')
+      if (wasChecking && !m.status.checking && (!m.status.update || !m.status.update.hasUpdate)) {
+        checkTickUntil = Date.now() + CHECK_TICK_MS
+      }
+      wasChecking = m.status.checking
       if (refreshingBalance) {
         refreshingBalance = false
         document.getElementById('balanceBtn').disabled = false
