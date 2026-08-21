@@ -13,13 +13,17 @@ export const DSH_NO_OPEN_MIN_VERSION = '0.1.0-rc.8'
 
 // --- server lifecycle state machine ---
 
-/** The dsh server lifecycle phase (the launcher's own view of it). */
-export type ServerPhase = 'stopped' | 'starting' | 'running' | 'stopping'
+/**
+ * The dsh server lifecycle phase (the launcher's own view of it). `installing`
+ * is the first-run setup (download / clone / build) before any spawn.
+ */
+export type ServerPhase = 'stopped' | 'installing' | 'starting' | 'running' | 'stopping'
 
 /** Valid direct transitions between server lifecycle phases. */
 const SERVER_PHASE_TRANSITIONS: Record<ServerPhase, ServerPhase[]> = {
   stopped: ['starting'],
-  starting: ['running', 'stopping', 'stopped'],
+  installing: ['starting', 'stopping', 'stopped'],
+  starting: ['installing', 'running', 'stopping', 'stopped'],
   running: ['stopping'],
   stopping: ['stopped'],
 }

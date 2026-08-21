@@ -65,6 +65,8 @@ export type ConditionState = 'unknown' | 'ok' | 'missing'
 export interface ServerStatus {
   running: boolean
   starting: boolean
+  /** First-run setup (download / clone / build) is in progress. */
+  installing: boolean
   /** Whether an update check is in progress (drives the Check updates button). */
   checking: boolean
   url: string
@@ -122,6 +124,23 @@ function setServerPhase(to: ServerPhase): void {
     dbg(`unexpected server phase transition ${serverPhase} -> ${to}`)
   }
   serverPhase = to
+}
+
+/**
+ * Run a first-install setup step (download / clone / build) inside the start
+ * flow: the phase temporarily becomes 'installing' so the panel shows the
+ * right status. Outside the start flow (e.g. an update) the phase is left
+ * untouched, and a Stop that intervenes mid-step is honoured.
+ */
+async function runInstalling<T>(task: () => Promise<T>): Promise<T> {
+  const phase = serverPhase
+  if (phase !== 'starting') return task()
+  setServerPhase('installing')
+  try {
+    return await task()
+  } finally {
+    if (serverPhase === 'installing') setServerPhase('starting')
+  }
 }
 let logTailWatcher: fs.FSWatcher | undefined
 let logTailTimer: ReturnType<typeof setInterval> | undefined
@@ -471,7 +490,7 @@ async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: 
   addActivity(`▶ Installing dsh v${version} (pnpm install)…`)
   const args = ['install', '--dir', quoteCmdArg(dir)]
   if (allowBuild) args.push('--dangerously-allow-all-builds')
-  const ok = await runInTerminal(`Install dsh v${version}`, `${pnpmCmd} ${args.join(' ')}`)
+  const ok = await runInstalling(() => runInTerminal(`Install dsh v${version}`, `${pnpmCmd} ${args.join(' ')}`))
   if (!ok || installedDshVersion(dir) !== version) {
     addActivity('✗ dsh install failed — see the terminal output above')
     void vscode.window.showErrorMessage('DeepSeek Harness: dsh install failed. Check the terminal output.')
@@ -503,7 +522,7 @@ async function ensurePnpmAvailable(): Promise<{ command: string; allowBuild: boo
   addActivity('✗ pnpm not found — installing it now (npm install -g pnpm)')
   // The phase is already 'starting' (set at the top of ensureRunningUnlocked).
   addActivity('▶ Installing pnpm (npm install -g pnpm)…')
-  const ok = await runInTerminal('Install pnpm', 'npm install -g pnpm')
+  const ok = await runInstalling(() => runInTerminal('Install pnpm', 'npm install -g pnpm'))
   if (!ok) {
     addActivity('✗ pnpm install failed — run `npm install -g pnpm` in a terminal, then try again')
     void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Run "npm install -g pnpm" in a terminal, then try again.')
@@ -554,7 +573,7 @@ async function ensureSourceCheckout(cfg: DshConfig): Promise<string | undefined>
   dshState = 'missing'
   addActivity('✗ No dsh source checkout found — cloning deepseek-harness…')
   addActivity(`▶ Cloning deepseek-harness → ${chosen}`)
-  const ok = await runInTerminal('Clone deepseek-harness', `git clone https://github.com/deepseek-ai/deepseek-harness.git "${chosen}"`)
+  const ok = await runInstalling(() => runInTerminal('Clone deepseek-harness', `git clone https://github.com/deepseek-ai/deepseek-harness.git "${chosen}"`))
   if (!ok || !isDshCheckout(chosen)) {
     addActivity('✗ clone failed — see the terminal output above')
     void vscode.window.showErrorMessage('DeepSeek Harness: could not clone deepseek-harness. Check your network and git, then try again.')
@@ -902,7 +921,7 @@ function exclusive(task: () => Promise<boolean>): Promise<boolean> {
     busy = undefined
     // A start that finished without reaching 'running' (or being stopped)
     // lands back at 'stopped'.
-    if (serverPhase === 'starting') setServerPhase('stopped')
+    if (serverPhase === 'starting' || serverPhase === 'installing') setServerPhase('stopped')
   })
   return busy
 }
@@ -945,14 +964,14 @@ async function ensureCheckoutReady(checkout: string): Promise<boolean> {
   // The phase is already 'starting' (set at the top of ensureRunningUnlocked),
   // so setup needs no extra flag handling — the panel spinner is driven by it.
   addActivity(`▶ Setup: pnpm --dir "${checkout}" install`)
-  const installOk = await runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`)
+  const installOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`))
   if (!installOk) {
     addActivity('✗ pnpm install failed')
     void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
     return false
   }
   addActivity(`▶ Setup: pnpm --dir "${checkout}" run build`)
-  const buildOk = await runInTerminal('Setup deepseek-harness (pnpm run build)', `pnpm --dir "${checkout}" run build`)
+  const buildOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm run build)', `pnpm --dir "${checkout}" run build`))
   if (!buildOk) {
     addActivity('✗ pnpm run build failed')
     void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
@@ -1000,6 +1019,9 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   if (!pnpmCmd) return false
   const version = await preparePkgStart(cfg, pnpmCmd.command, pnpmCmd.allowBuild)
   if (!version) return false
+  // The install may have run while the user pressed Stop; honour that request
+  // instead of starting a server nobody is waiting for.
+  if (serverPhase === 'stopping') return false
   spawnPkg(cfg, pnpmCmd.command, version)
   return waitForPort(cfg)
 }
@@ -1079,7 +1101,7 @@ async function stopServerUnlocked(): Promise<boolean> {
     pids.push(owner)
     killPid(owner)
   }
-  const wasStarting = serverPhase === 'starting'
+  const wasStarting = serverPhase === 'starting' || serverPhase === 'installing'
   setServerPhase('stopped')
   stopLogTail()
   if (pids.length === 0) {
@@ -1107,7 +1129,7 @@ export function stopServer(): Promise<boolean> {
   // skip stopping). The phase makes the concurrent waitForPort bail out.
   // Rapid repeat clicks coalesce onto the one in-flight stop.
   if (stopInFlight) return stopInFlight
-  if (serverPhase === 'starting' || serverPhase === 'running') setServerPhase('stopping')
+  if (serverPhase === 'installing' || serverPhase === 'starting' || serverPhase === 'running') setServerPhase('stopping')
   stopInFlight = stopServerUnlocked().finally(() => {
     stopInFlight = undefined
   })
@@ -1218,6 +1240,7 @@ export async function currentStatus(): Promise<ServerStatus> {
   return {
     running,
     starting: serverPhase === 'starting' || serverPhase === 'stopping',
+    installing: serverPhase === 'installing',
     checking: checkingUpdates,
     url: uiUrl(cfg),
     node: nodeState,

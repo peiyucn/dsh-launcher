@@ -248,19 +248,20 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       status = status || {}
       const running = !!(status.running)
       const starting = !!(status.starting)
-      // Stop must be reachable while starting too, so a slow start can be
-      // interrupted (server.ts bails out of waitForPort when it sees the stop).
-      document.querySelectorAll('.when-running').forEach((b) => { b.style.display = (running || starting) ? '' : 'none' })
+      const installing = !!(status.installing)
+      // Stop must be reachable while starting/installing too, so a slow start
+      // or first-run install can be interrupted.
+      document.querySelectorAll('.when-running').forEach((b) => { b.style.display = (running || starting || installing) ? '' : 'none' })
       const dot = document.getElementById('dot')
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
       const startBtn = document.getElementById('startBtn')
-      if (starting) {
+      if (starting || installing) {
         const justStarted = startElapsed()
         if (justStarted) statusSub.textContent = 'Waited 0s'
         dot.className = 'dot working'
-        statusText.textContent = 'Starting DeepSeek Harness Web UI…'
-        startBtn.textContent = 'Starting…'
+        statusText.textContent = installing ? 'Installing dsh…' : 'Starting DeepSeek Harness Web UI…'
+        startBtn.textContent = installing ? 'Installing…' : 'Starting…'
         startBtn.disabled = true
       } else {
         stopElapsed()
@@ -637,6 +638,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const fallback: ServerStatus = {
         running: false,
         starting: false,
+        installing: false,
         checking: false,
         url: '',
         node: 'unknown',

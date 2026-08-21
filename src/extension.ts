@@ -43,9 +43,9 @@ export function activate(context: vscode.ExtensionContext): void {
       statusBar.text = '🐳\uFE0E DSH'
       statusBar.color = '#4D6BFE'
       statusBar.tooltip = `DeepSeek Harness running at ${status.url} — click to open`
-    } else if (status.starting) {
+    } else if (status.starting || status.installing) {
       statusBar.color = undefined
-      statusBar.tooltip = 'DeepSeek Harness starting — click to open when ready'
+      statusBar.tooltip = status.installing ? 'DeepSeek Harness installing — click to open when ready' : 'DeepSeek Harness starting — click to open when ready'
       if (!spinnerTimer) {
         let i = 0
         statusBar.text = '🐳\uFE0E DSH ⠋'
