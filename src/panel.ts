@@ -211,6 +211,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   </div>
   <div class="version-row">
     <span class="plugin-version" id="nodeVersionFooter">node —</span>
+    <span class="plugin-version">·</span>
     <span class="plugin-version" id="pluginVersion">launcher v${this.version}</span>
   </div>
   <script nonce="${nonce}">
