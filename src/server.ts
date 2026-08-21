@@ -315,9 +315,15 @@ function pnpmCachedDshVersion(): string | undefined {
 async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<string | undefined> {
   const spec = channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/d', '/s', '/c', `"${quoteCmdArg(pnpmCmd)} view ${spec} version"`], 10_000)
+    ? await runFile('cmd', ['/c', pnpmCmd, 'view', spec, 'version'], 10_000)
     : await runFile(pnpmCmd, ['view', spec, 'version'], 10_000)
-  if (!result.ok) return undefined
+  if (!result.ok) {
+    // Keep the failure visible for diagnosis: registry outages and cmd
+    // quoting problems both surface here as "unreachable" to the user.
+    const last = result.stderr.trim().split(/\r?\n/).pop()?.trim()
+    if (last) dbg(`pnpm view failed: ${last}`)
+    return undefined
+  }
   return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
 }
 
@@ -710,11 +716,16 @@ function spawnPnpm(cfg: DshConfig, pnpmCmd: string, spec: string): void {
   addActivity('✓ dsh detected (pnpm dlx run)')
   const webArgs = buildWebArgs(cfg)
   addActivity(`▶ Start: pnpm dlx ${spec} ${webArgs.join(' ')}`, true)
-  // Windows: pnpm is a .cmd shim, so run it through the shell. pnpm prints
-  // per-package download progress, so a long install stays visible in the
-  // console instead of looking frozen.
-  const cmd = process.platform === 'win32' ? quoteCmdArg(pnpmCmd) : pnpmCmd
-  spawnServer(cmd, ['dlx', spec, ...webArgs], undefined, process.platform === 'win32')
+  if (process.platform === 'win32') {
+    // pnpm is a .cmd shim: drive it through cmd with the arguments array, so
+    // Windows quoting keeps fallback shim paths (possibly containing spaces)
+    // intact in both the hidden-console and the visible-console spawn paths.
+    // pnpm prints per-package download progress, so a long install stays
+    // visible in the console instead of looking frozen.
+    spawnServer('cmd', ['/c', pnpmCmd, 'dlx', spec, ...webArgs], undefined, false)
+  } else {
+    spawnServer(pnpmCmd, ['dlx', spec, ...webArgs], undefined, false)
+  }
 }
 
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
