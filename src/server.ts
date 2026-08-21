@@ -348,20 +348,16 @@ async function preparePnpmInstall(cfg: DshConfig, pnpmCmd = 'pnpm'): Promise<boo
 }
 /**
  * Make sure pnpm is available in pnpm mode: resolve it on PATH (or the known
- * Windows shim locations), and offer to install it via npm when missing.
+ * Windows shim locations), and install it via npm when missing. There is no
+ * prompt — without pnpm the start cannot proceed, so the console announces
+ * the reason and the install begins immediately.
  * Returns the resolved command, or undefined when the start must abort.
  */
 async function ensurePnpmAvailable(): Promise<string | undefined> {
   const found = await findPnpm()
   if (found) return found
   dshState = 'missing'
-  addActivity('✗ pnpm not found — DeepSeek Harness starts with pnpm')
-  const pick = await vscode.window.showInformationMessage(
-    'DeepSeek Harness runs dsh with pnpm, which is not installed on this machine. Install it now (npm install -g pnpm)?',
-    'Install pnpm',
-    'Cancel',
-  )
-  if (pick !== 'Install pnpm') return undefined
+  addActivity('✗ pnpm not found — installing it now (npm install -g pnpm)')
   // Installing pnpm is part of the start: mark starting so the panel shows a
   // spinner and the Start button stays disabled while npm works.
   starting = true

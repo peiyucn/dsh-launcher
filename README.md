@@ -57,7 +57,7 @@ Settings → search "dsh":
 ## Environment
 
 * **Node.js** — 22.19+ (or >= 24)
-* **pnpm** — required for the default pnpm mode; if missing, the extension offers to install it (`npm install -g pnpm`) on first start
+* **pnpm** — required for the default pnpm mode; if missing, the extension installs it automatically (`npm install -g pnpm`) on first start
 * **VS Code** — 1.85+
 * **PowerShell 7** — optional; recommended on Windows
 
