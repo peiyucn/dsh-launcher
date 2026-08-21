@@ -63,6 +63,8 @@ export type ConditionState = 'unknown' | 'ok' | 'missing'
 export interface ServerStatus {
   running: boolean
   starting: boolean
+  /** Whether an update check is in progress (drives the Check updates button). */
+  checking: boolean
   url: string
   node: ConditionState
   dsh: ConditionState
@@ -108,6 +110,7 @@ const activity: ActivityEntry[] = []
 let nodeState: ConditionState = 'unknown'
 let dshState: ConditionState = 'unknown'
 let starting = false
+let checkingUpdates = false
 let logTailWatcher: fs.FSWatcher | undefined
 let logTailTimer: ReturnType<typeof setInterval> | undefined
 let logTailOffset = 0
@@ -1210,6 +1213,7 @@ export async function currentStatus(): Promise<ServerStatus> {
   return {
     running,
     starting,
+    checking: checkingUpdates,
     url: uiUrl(cfg),
     node: nodeState,
     dsh: dshState,
@@ -1236,8 +1240,13 @@ export async function currentStatus(): Promise<ServerStatus> {
 export async function clearRequirementsCaches(): Promise<void> {
   detectionCache = undefined
   updateCache = undefined
-  const update = await checkDshUpdateStatus(readConfig())
-  updateCache = { update, at: Date.now() }
+  checkingUpdates = true
+  try {
+    const update = await checkDshUpdateStatus(readConfig())
+    updateCache = { update, at: Date.now() }
+  } finally {
+    checkingUpdates = false
+  }
 }
 
 /** Clear the console log (in-memory feed and the persisted file). */

@@ -290,6 +290,14 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         updateBtn.style.display = 'none'
       }
 
+      // Check updates button mirrors Start: disabled + "Checking…" while the
+      // server-side check is in flight, re-enabled by the next status update.
+      const checkBtn = document.getElementById('refreshBtn')
+      if (checkBtn) {
+        checkBtn.disabled = !!status.checking
+        checkBtn.textContent = status.checking ? 'Checking…' : 'Check updates'
+      }
+
       // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
       const runtimePath = document.getElementById('runtimePath')
       runtimePath.textContent = status.dshPathShort || '—'
@@ -410,15 +418,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       })
     })
 
-    let refreshingReqs = false
     document.getElementById('refreshBtn').addEventListener('click', () => {
-      if (refreshingReqs) return
-      refreshingReqs = true
       const btn = document.getElementById('refreshBtn')
+      if (btn.disabled) return
       btn.disabled = true
       btn.textContent = 'Checking…'
       vscode.postMessage({ command: 'refreshRequirements' })
-      // Re-enabled by the 'checkDone' message once the check actually finishes.
+      // Re-enabled by renderRuntime once status.checking goes false (same as Start).
     })
     let refreshingBalance = false
     document.getElementById('balanceBtn').addEventListener('click', () => {
@@ -458,15 +464,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
 
     window.addEventListener('message', (e) => {
       const m = e.data
-      if (m && m.type === 'checkDone') {
-        if (refreshingReqs) {
-          refreshingReqs = false
-          const btn = document.getElementById('refreshBtn')
-          btn.disabled = false
-          btn.textContent = 'Check updates'
-        }
-        return
-      }
       if (!m || m.type !== 'update') return
       gotUpdate = true
       document.getElementById('loadingOverlay').classList.add('hidden')
@@ -534,8 +531,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
           )
         }
         finishBusy()
-        // Signal the webview that the check finished so it re-enables the button.
-        await this.view?.webview.postMessage({ type: 'checkDone' })
         break
       case 'setMode':
         if (message.value === 'pnpm' || message.value === 'source') {
@@ -640,6 +635,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const fallback: ServerStatus = {
         running: false,
         starting: false,
+        checking: false,
         url: '',
         node: 'unknown',
         dsh: 'unknown',
