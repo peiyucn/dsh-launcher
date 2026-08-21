@@ -152,7 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-sub" id="statusSub"></span>
       </div>
       <div class="mode-toggle" id="modeToggle">
-        <button class="mode-option" data-mode="npx">npx</button>
+        <button class="mode-option" data-mode="pnpm">pnpm</button>
         <button class="mode-option" data-mode="source">source</button>
       </div>
     </div>
@@ -175,7 +175,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     <div class="req-header">
       <span class="req-title">Requirements</span>
       <span class="req-hint" id="refreshHint"></span>
-      <button class="icon-btn" id="refreshBtn" title="Re-check Node / npm / DSH / updates">⟳</button>
+      <button class="icon-btn" id="refreshBtn" title="Re-check Node / pnpm / DSH / updates">⟳</button>
     </div>
     <div class="req-row">
       <span class="req-name">Node</span>
@@ -303,12 +303,12 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         statusSub.textContent = running ? (status.url || '') : ''
         startBtn.textContent = running ? '↗ New Tab' : '▶ Start'
       }
-      const mode = status.mode === 'source' ? 'source' : 'npx'
+      const mode = status.mode === 'source' ? 'source' : 'pnpm'
       document.querySelectorAll('.mode-option').forEach((b) => {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
       // data is always shown (top row); the path row only exists in source
-      // mode and stays hidden under npx, where there is no local checkout.
+      // mode and stays hidden under pnpm, where there is no local checkout.
       runtimeData.textContent = status.dshHomeShort || '—'
       runtimeData.title = status.dshHome || ''
       if (mode === 'source') {
@@ -334,7 +334,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     function renderRequirements(status) {
       status = status || {}
       document.getElementById('nodeVersion').textContent = status.nodeVersion || (status.node === 'missing' ? 'not found' : '—')
-      document.getElementById('dshVersion').textContent = status.dshVersion ? ('v' + status.dshVersion) : (status.dsh === 'missing' ? 'not found' : '—')
+      const dshMissingText = status.dsh === 'missing' ? (status.mode === 'pnpm' ? 'pnpm not found' : 'not found') : '—'
+      document.getElementById('dshVersion').textContent = status.dshVersion ? ('v' + status.dshVersion) : dshMissingText
       setMark('req-node', status.node)
       setMark('req-dsh', status.dsh)
 
@@ -370,7 +371,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     function renderDebug(status) {
       const pill = document.getElementById('debugToggle')
       if (!pill) return
-      // NODE_DEBUG=module only applies to source mode; hide the pill under npx.
+      // NODE_DEBUG=module only applies to source mode; hide the pill under pnpm.
       if (status && status.mode !== 'source') {
         pill.style.display = 'none'
         return
@@ -580,7 +581,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         finishBusy()
         break
       case 'setMode':
-        if (message.value === 'npx' || message.value === 'source') {
+        if (message.value === 'pnpm' || message.value === 'source') {
           const st = await currentStatus()
           if (st.running) {
             // Confirm before switching so that cancelling keeps the current mode.

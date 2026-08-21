@@ -14,12 +14,12 @@
 
 ## 设计原则
 
-* **松耦合** — 扩展只通过它的公开入口（`npx` 或源码检出）启动它并打开 Web UI，不依赖 dsh 的内部实现——所以你配的 dsh 插件照常生效。
+* **松耦合** — 扩展只通过它的公开入口（`pnpm dlx` 或源码检出）启动它并打开 Web UI，不依赖 dsh 的内部实现——所以你配的 dsh 插件照常生效。
 * **适应快速变化** — 用官方命令启动、只读稳定的 `~/.dsh` 数据，升级后也能继续工作。
 
 ## 功能
 
-* **启动 / 停止** — 通过 `npx` 运行 dsh，并在就绪后打开 Web UI。
+* **启动 / 停止** — 通过 `pnpm dlx` 运行 dsh，并在就绪后打开 Web UI。
 * **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为 deepseek-harness 的 git clone 目录。刚 clone 下来也能直接用——首次启动时会提示自动执行 `pnpm install` + 构建。
 * **仪表盘面板** — 服务状态、实时控制台（含可点击的日志文件）、带峰谷时段标志的 DeepSeek 官方 API 状态以及你的账户余额。
 * **DSH 更新** — 仅源码运行：点击刷新按钮（⟳）检查新版本；有更新时会出现带新版本号的 Update 按钮，点击即可拉取更新。
@@ -35,8 +35,8 @@
 
 | 键               | 默认值       | 说明                                                          |
 | --------------- | --------- | ----------------------------------------------------------- |
-| dsh.mode        | npx       | `npx` 运行 `npx @deepseek-ai/dsh web`；`source` 通过 tsx 运行本地检出         |
-| dsh.channel     | latest    | npx 解析的 npm dist-tag：`latest`（稳定）或 `next`（预发布；rc.8 在 `next` 上，选它才能跑 rc.8） |
+| dsh.mode        | pnpm      | `pnpm` 运行 `pnpm dlx @deepseek-ai/dsh web`；`source` 通过 tsx 运行本地检出        |
+| dsh.channel     | latest    | pnpm 解析的 dist-tag：`latest`（稳定）或 `next`（预发布）                  |
 | dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器；`external` 打开系统浏览器                 |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
 | dsh.path        | 空         | source 模式的 deepseek-harness 检出路径（首次启动会提示自动构建）                  |
@@ -47,6 +47,7 @@
 
 ## 说明
 
+* 默认的 pnpm 模式使用 `pnpm dlx`——dsh 仓库自己用的就是它；npm 的 peer 解析器在 dsh 的依赖图上可能无限挂起，所以不提供 `npx`。
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。
@@ -56,6 +57,7 @@
 ## 环境
 
 * **Node.js** — 22.19+（或 >= 24）
+* **pnpm** — 默认 pnpm 模式需要（用 `npm install -g pnpm` 安装）
 * **VS Code** — 1.85+
 * **PowerShell 7** — 可选；Windows 下推荐安装
 

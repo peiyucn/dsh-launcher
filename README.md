@@ -14,12 +14,12 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 
 ## Principles
 
-* **Loose coupling** — the extension only starts dsh through its public entry point (`npx` or a source checkout) and opens the web UI, never depending on dsh internals — so the dsh plugins you configure keep working as-is.
+* **Loose coupling** — the extension only starts dsh through its public entry point (`pnpm dlx` or a source checkout) and opens the web UI, never depending on dsh internals — so the dsh plugins you configure keep working as-is.
 * **Resilient to fast change** — it launches with the official command and reads only stable `~/.dsh` data, so it keeps working across upgrades.
 
 ## Features
 
-* **Start / Stop** — runs dsh via `npx` and opens the web UI once it is ready.
+* **Start / Stop** — runs dsh via `pnpm dlx` and opens the web UI once it is ready.
 * **Source run (optional)** — run from a local checkout: set `dsh.path` to a deepseek-harness git clone. A fresh clone works — on first start the extension offers to run `pnpm install` + build for you.
 * **Dashboard panel** — server status, a live console (with clickable log files), the official DeepSeek API status with Peak / Off-peak pricing, and your account balance.
 * **DSH Update** — source run only: click the refresh button (⟳) to check for updates; when one is available, an Update button labeled with the new version appears, and clicking it pulls the update.
@@ -35,8 +35,8 @@ Settings → search "dsh":
 
 | Key | Default | Description |
 |---|---|---|
-| dsh.mode | npx | `npx` runs `npx @deepseek-ai/dsh web`; `source` runs a local checkout via tsx |
-| dsh.channel | latest | npm dist-tag npx resolves: `latest` (stable) or `next` (prereleases; rc.8 is on `next` — choose it to run rc.8) |
+| dsh.mode | pnpm | `pnpm` runs `pnpm dlx @deepseek-ai/dsh web`; `source` runs a local checkout via tsx |
+| dsh.channel | latest | dist-tag pnpm resolves: `latest` (stable) or `next` (prereleases) |
 | dsh.browser | built-in | `built-in` uses VS Code's Simple Browser; `external` opens the system browser |
 | dsh.hideConsole | true | Hide the server console window on Windows |
 | dsh.path | empty | Path to a deepseek-harness git clone for source mode (first start offers to build it) |
@@ -47,6 +47,7 @@ Settings → search "dsh":
 
 ## Notes
 
+* The default pnpm mode uses `pnpm dlx`, the same tool the dsh repo itself uses — npm's peer resolver can hang indefinitely on dsh's dependency graph, so `npx` is not offered.
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **API Status** card supports DeepSeek only for now — it only shows when a DeepSeek model is configured in dsh.
@@ -56,6 +57,7 @@ Settings → search "dsh":
 ## Environment
 
 * **Node.js** — 22.19+ (or >= 24)
+* **pnpm** — required for the default pnpm mode (install with `npm install -g pnpm`)
 * **VS Code** — 1.85+
 * **PowerShell 7** — optional; recommended on Windows
 

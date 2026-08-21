@@ -12,7 +12,7 @@ VS Code 扩展「DSH Launcher Panel」：启动 DeepSeek Harness（dsh），并�
 
 * TypeScript 实现，源码在 `src/`；编译产物 `out/` 与打包产物 `*.vsix` 均不入库（见 `.gitignore`）
 * 本地验证 = `npm run verify`（编译 + 测试 + 打包）全部成功，打包由 `@vscode/vsce` 完成
-* 测试：`npm test`（tsc 编译后跑 Node 内置 test runner），用例在 `test/*.test.mjs`，覆盖不依赖 vscode 的纯逻辑模块（`common`、`ds`）；依赖 `vscode` 的链路暂由集成测试覆盖（后续版本）
+* 测试：`npm test`（tsx 直跑 Node 内置 test runner），用例在 `test/*.test.ts`，覆盖不依赖 vscode 的纯逻辑模块（`common`、`ds`）；依赖 `vscode` 的链路暂由集成测试覆盖（后续版本）
 * 主要模块：`extension.ts`（激活与状态栏）、`server.ts`（服务生命周期与检测）、`actions.ts`（启动/停止/浏览器）、`panel.ts`（Dashboard webview）、`ds.ts`（DeepSeek 状态与余额）、`common.ts`（常量与工具）
 
 ***
@@ -47,7 +47,7 @@ VS Code 扩展「DSH Launcher Panel」：启动 DeepSeek Harness（dsh），并�
 * **资源清理**：定时器/AbortController/句柄在异常路径同样释放（finally）
 * **鲁棒性**：外部调用（子进程/网络/文件）有超时或 best-effort 错误处理，失败不挂死、不崩；解析/格式化函数对异常输入（空、malformed、缺失字段）返回安全默认值、不抛；失败路径给用户可见反馈，不静默
 * **并发与防御**：每个 UI 入口连点有防护（锁/debounce/disabled/幂等）；Start/Stop/切模式的竞态可被用户打断且状态一致；Windows 杀进程用 `taskkill /T`，不留孤儿 server
-* **测试**：纯逻辑改动补 `test/*.test.mjs` 用例（尤其回归点）；新增可测纯函数需 export
+* **测试**：纯逻辑改动补 `test/*.test.ts` 用例（尤其回归点）；新增可测纯函数需 export
 * **验证**：`npm run verify` 通过，`git diff --check` 无空白错误
 
 ### 发布（Tag 触发）

@@ -1,7 +1,6 @@
 import * as fs from 'node:fs'
 import * as net from 'node:net'
 import * as path from 'node:path'
-import * as os from 'node:os'
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import * as vscode from 'vscode'
 import {
@@ -19,10 +18,12 @@ import {
   STOP_POLL_ATTEMPTS,
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
+  bestDshVersionInDlxCache,
   dshVersionAtLeast,
   findOnPath,
   isProcessAlive,
   maskPath,
+  pnpmCacheRoot,
   psQuote,
   quoteCmdArg,
   resolveDshHome,
@@ -34,7 +35,7 @@ import {
 // module stays focused on server lifecycle).
 export { fetchDshBalance, getDshBalance, getDsStatus, hasDeepSeekModel } from './ds'
 
-export type DshMode = 'npx' | 'source'
+export type DshMode = 'pnpm' | 'source'
 
 /** dsh binds loopback only; the launcher probes and opens this fixed host. */
 const LOOPBACK_HOST = '127.0.0.1'
@@ -44,7 +45,7 @@ export type DshChannel = 'latest' | 'next'
 /** Resolved extension settings (dsh.*). */
 export interface DshConfig {
   mode: DshMode
-  /** Which npm dist-tag npx resolves: 'latest' (default) or 'next' (prereleases). */
+  /** Which npm dist-tag pnpm resolves: 'latest' (default) or 'next' (prereleases). */
   channel: DshChannel
   path: string
   nodePath: string
@@ -68,7 +69,7 @@ export interface ServerStatus {
   dshPathShort: string
   dshHomeShort: string
   nodeVersion: string
-  mode: 'npx' | 'source'
+  mode: 'pnpm' | 'source'
   update: DshUpdate | undefined
   /** Launcher activity log + server stdout/stderr log (full and masked paths). */
   consoleLogPath: string
@@ -109,7 +110,7 @@ let logTailOffset = 0
 let logTailBuffer = ''
 let moduleLoadCount = 0
 let dshVersion = ''
-let dshSource: '' | 'npx' | 'source' = ''
+let dshSource: '' | 'pnpm' | 'source' = ''
 let dshPath = ''
 let nodeVersion = ''
 
@@ -118,7 +119,7 @@ export function readConfig(): DshConfig {
   // of truth, so both the panel toggle and the Settings UI stay in sync.
   const c = vscode.workspace.getConfiguration('dsh')
   return {
-    mode: c.get<string>('mode') === 'source' ? 'source' : 'npx',
+    mode: c.get<string>('mode') === 'source' ? 'source' : 'pnpm',
     channel: c.get<string>('channel') === 'next' ? 'next' : 'latest',
     path: c.get<string>('path') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
@@ -128,7 +129,7 @@ export function readConfig(): DshConfig {
 }
 
 /** Persist the run mode chosen in the panel toggle and apply it immediately. */
-export async function applyMode(mode: 'npx' | 'source'): Promise<void> {
+export async function applyMode(mode: 'pnpm' | 'source'): Promise<void> {
   detectionCache = undefined
   await vscode.workspace.getConfiguration('dsh').update('mode', mode, vscode.ConfigurationTarget.Global)
 }
@@ -303,61 +304,44 @@ async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string
   return { ok: major >= 24 || (major === 22 && minor >= 19), version }
 }
 
-/** Read the newest @deepseek-ai/dsh version cached under the npx cache. */
-function npxCachedDshVersion(): string | undefined {
-  const cacheRoot = process.platform === 'win32'
-    ? (process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'npm-cache') : undefined)
-    : path.join(os.homedir(), '.npm')
-  if (!cacheRoot) return undefined
-  let best: string | undefined
-  try {
-    for (const entry of fs.readdirSync(path.join(cacheRoot, '_npx'), { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue
-      try {
-        const pkg = JSON.parse(fs.readFileSync(path.join(cacheRoot, '_npx', entry.name, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')) as { version?: string }
-        const v = pkg?.version
-        if (v && (best === undefined || v > best)) best = v
-      } catch {
-        // no dsh package in this npx slot
-      }
-    }
-  } catch {
-    // no npx cache
-  }
-  return best
+/** Read the newest @deepseek-ai/dsh version cached under the pnpm dlx cache. */
+function pnpmCachedDshVersion(): string | undefined {
+  const root = pnpmCacheRoot()
+  if (!root) return undefined
+  return bestDshVersionInDlxCache(path.join(root, 'dlx'))
 }
 
 /** Resolve the published @deepseek-ai/dsh version for a channel (undefined on failure). */
 async function latestDshVersion(channel: DshChannel): Promise<string | undefined> {
   const spec = channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', 'npm', 'view', spec, 'version'], 10_000)
-    : await runFile('npm', ['view', spec, 'version'], 10_000)
+    ? await runFile('cmd', ['/c', 'pnpm', 'view', spec, 'version'], 10_000)
+    : await runFile('pnpm', ['view', spec, 'version'], 10_000)
   if (!result.ok) return undefined
   return result.stdout.trim().split(/\r?\n/).pop()?.trim() || undefined
 }
 
-/** Prepare the npx start: verify the registry when a download is required, and announce installs. Returns false to abort. */
-async function prepareNpxInstall(cfg: DshConfig): Promise<boolean> {
-  const cached = npxCachedDshVersion()
+/** Prepare the pnpm start: verify the registry when a download is required, and announce installs. Returns false to abort. */
+async function preparePnpmInstall(cfg: DshConfig): Promise<boolean> {
+  const cached = pnpmCachedDshVersion()
   if (cached === undefined) {
-    // Nothing cached: npx must download dsh, so verify the registry is
+    // Nothing cached: pnpm must download dsh, so verify the registry is
     // reachable first; a network outage should fail fast, not hang the start.
     const latest = await latestDshVersion(cfg.channel)
     if (!latest) {
       dshState = 'missing'
-      addActivity('✗ dsh is not installed and the npm registry is unreachable — check your network and try again')
-      void vscode.window.showErrorMessage('DeepSeek Harness: unable to reach the npm registry to install dsh. Check your network connection.')
+      addActivity('✗ dsh is not installed and the registry is unreachable — check your network and try again')
+      void vscode.window.showErrorMessage('DeepSeek Harness: unable to reach the registry to install dsh. Check your network connection.')
       return false
     }
-    addActivity(`ℹ dsh v${latest} — npx will install it on first run; this can take a while, please wait`)
+    addActivity(`ℹ dsh v${latest} — pnpm will install it on first run; this can take a while, please wait`)
     return true
   }
   // Cached: optionally announce an upgrade (best-effort, non-blocking).
   void (async () => {
     const latest = await latestDshVersion(cfg.channel)
     if (latest && latest !== cached) {
-      addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — npx will update it before starting; this can take a while`)
+      addActivity(`ℹ dsh v${latest} is available (cached: v${cached}) — pnpm will update it before starting; this can take a while`)
     }
   })()
   return true
@@ -412,7 +396,7 @@ async function pickRepoFolder(): Promise<string | undefined> {
   return dir
 }
 
-/** Detect the local dsh version: a source checkout (source mode), else the npx cache. */
+/** Detect the local dsh version: a source checkout (source mode), else the pnpm dlx cache. */
 function detectDshVersion(cfg: DshConfig): void {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
@@ -429,29 +413,29 @@ function detectDshVersion(cfg: DshConfig): void {
     }
     return
   }
-  // npx mode: only the npx cache counts (npx reinstalls from the registry on demand).
-  dshVersion = npxCachedDshVersion() ?? ''
+  // pnpm mode: only the pnpm dlx cache counts (pnpm dlx reinstalls from the registry on demand).
+  dshVersion = pnpmCachedDshVersion() ?? ''
 }
 
 interface DshDetection {
   state: ConditionState
-  source: '' | 'npx' | 'source'
+  source: '' | 'pnpm' | 'source'
   path: string
 }
 
-/** Detect dsh: source mode uses a checkout; npx uses the official npx method. */
+/** Detect dsh: source mode uses a checkout; pnpm uses the official pnpm dlx method. */
 async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
     return { state: 'missing', source: '', path: '' }
   }
-  if (!(await findOnPath('npx'))) return { state: 'missing', source: '', path: '' }
-  // npx present: 'ok' only when dsh is already cached; otherwise the first
+  if (!(await findOnPath('pnpm'))) return { state: 'missing', source: '', path: '' }
+  // pnpm present: 'ok' only when dsh is already cached; otherwise the first
   // start will download it, so mark it 'unknown' (version stays empty).
-  return npxCachedDshVersion() !== undefined
-    ? { state: 'ok', source: 'npx', path: '' }
-    : { state: 'unknown', source: 'npx', path: '' }
+  return pnpmCachedDshVersion() !== undefined
+    ? { state: 'ok', source: 'pnpm', path: '' }
+    : { state: 'unknown', source: 'pnpm', path: '' }
 }
 
 /** Run a command in a visible VS Code terminal (used for updates). */
@@ -663,9 +647,9 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
 
 /**
  * The `web` command tail: the port, plus `--no-open` when dsh ≥ rc.8 would
- * open the system browser on its own. `knownNew` covers the npx `next`
- * channel, where the cached version (rc.7) under-reports the version that
- * will actually run (rc.8+) on a first install.
+ * open the system browser on its own. `knownNew` covers the `next` channel,
+ * where the cached version under-reports the version that will actually run
+ * on a first install.
  */
 function buildWebArgs(cfg: DshConfig, knownNew = false): string[] {
   const args = ['web', '--port', String(cfg.port)]
@@ -685,17 +669,17 @@ function spawnSource(repoPath: string, cfg: DshConfig): void {
   spawnServer(node, ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', ...webArgs], repoPath, false, env)
 }
 
-/** npx mode: run the official `npx @deepseek-ai/dsh web` command (per the chosen channel). */
-function spawnNpm(cfg: DshConfig): void {
+/** pnpm mode: run the official `pnpm dlx @deepseek-ai/dsh web` command (per the chosen channel). */
+function spawnPnpm(cfg: DshConfig): void {
   dshState = 'ok'
-  addActivity('✓ dsh detected (npx run)')
+  addActivity('✓ dsh detected (pnpm dlx run)')
   const spec = cfg.channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const webArgs = buildWebArgs(cfg, cfg.channel === 'next')
-  addActivity(`▶ Start: npx ${spec} ${webArgs.join(' ')}`, true)
-  // Windows: npx is a .cmd shim, so run it through the shell.
-  // `--loglevel=http` makes npm print each package fetch (with timing) so
-  // a long install is visible in the console instead of looking frozen.
-  spawnServer('npx', ['--loglevel', 'http', '-y', spec, ...webArgs], undefined, process.platform === 'win32')
+  addActivity(`▶ Start: pnpm dlx ${spec} ${webArgs.join(' ')}`, true)
+  // Windows: pnpm is a .cmd shim, so run it through the shell. pnpm prints
+  // per-package download progress, so a long install stays visible in the
+  // console instead of looking frozen.
+  spawnServer('pnpm', ['dlx', spec, ...webArgs], undefined, process.platform === 'win32')
 }
 
 /** Poll the port until it opens, the spawned process dies, or the user stops. */
@@ -849,15 +833,21 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     return waitForPort(cfg)
   }
 
-  // npx (and legacy auto) both use the official npx method (source needs explicit opt-in)
-  if (!(await prepareNpxInstall(cfg))) return false
-  spawnNpm(cfg)
+  // pnpm mode: the official `pnpm dlx @deepseek-ai/dsh web` method (source needs explicit opt-in)
+  if (!(await findOnPath('pnpm'))) {
+    dshState = 'missing'
+    addActivity('✗ pnpm not found — install it with `npm install -g pnpm`, then restart VS Code')
+    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm is not installed. Run "npm install -g pnpm" in a terminal, then restart VS Code.')
+    return false
+  }
+  if (!(await preparePnpmInstall(cfg))) return false
+  spawnPnpm(cfg)
   return waitForPort(cfg)
 }
 
 /**
  * Make sure the server is running. Resolution: a source checkout (git clone)
- * or the official `npx @deepseek-ai/dsh web` method. Concurrent calls
+ * or the official `pnpm dlx @deepseek-ai/dsh web` method. Concurrent calls
  * coalesce onto the in-flight run.
  */
 export function ensureRunning(cfg: DshConfig = readConfig()): Promise<boolean> {
@@ -1000,7 +990,7 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
 export async function runDshUpdate(): Promise<void> {
   const cfg = readConfig()
   if (cfg.mode !== 'source') {
-    addActivity('↑ No update needed (npx mode resolves latest)')
+    addActivity('↑ No update needed (pnpm mode resolves latest)')
     return
   }
   const checkout = findSourceCheckout(cfg)
@@ -1058,7 +1048,7 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshPathShort: maskPath(dshPath),
     dshHomeShort: maskPath(dshHome),
     nodeVersion,
-    mode: cfg.mode === 'source' ? 'source' : 'npx',
+    mode: cfg.mode === 'source' ? 'source' : 'pnpm',
     update: updateCache?.update,
     consoleLogPath: consolePath,
     consoleLogPathShort: maskPath(consolePath),

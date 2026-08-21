@@ -1,3 +1,4 @@
+import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { execFile } from 'node:child_process'
@@ -103,6 +104,59 @@ export function runFile(command: string, args: string[], timeoutMs = 0): Promise
       resolve({ ok: !error, stdout: stdout ?? '', stderr: stderr ?? '' })
     })
   })
+}
+
+// --- pnpm dlx cache ---
+
+/**
+ * The pnpm cache root for the current platform (pnpm's default cache-dir).
+ * dlx downloads live under <cache>/dlx.
+ */
+export function pnpmCacheRoot(
+  platform: NodeJS.Platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+  home: string = os.homedir(),
+): string | undefined {
+  if (platform === 'win32') {
+    const base = env.LOCALAPPDATA && env.LOCALAPPDATA.trim() !== '' ? env.LOCALAPPDATA : path.join(home, 'AppData', 'Local')
+    return path.join(base, 'pnpm-cache')
+  }
+  if (platform === 'darwin') return path.join(home, 'Library', 'Caches', 'pnpm')
+  const base = env.XDG_CACHE_HOME && env.XDG_CACHE_HOME.trim() !== '' ? env.XDG_CACHE_HOME : path.join(home, '.cache')
+  return path.join(base, 'pnpm')
+}
+
+/**
+ * The best @deepseek-ai/dsh version found under a pnpm dlx cache root
+ * (dlx/<hash>/<tmp>/node_modules/@deepseek-ai/dsh/package.json).
+ */
+export function bestDshVersionInDlxCache(dlxRoot: string): string | undefined {
+  let best: string | undefined
+  try {
+    for (const entry of fs.readdirSync(dlxRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const hashDir = path.join(dlxRoot, entry.name)
+      let slots: fs.Dirent[]
+      try {
+        slots = fs.readdirSync(hashDir, { withFileTypes: true })
+      } catch {
+        continue // unreadable dlx entry
+      }
+      for (const slot of slots) {
+        if (!slot.isDirectory()) continue
+        try {
+          const pkg = JSON.parse(fs.readFileSync(path.join(hashDir, slot.name, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')) as { version?: string }
+          const v = pkg?.version
+          if (v && (best === undefined || dshVersionAtLeast(v, best))) best = v
+        } catch {
+          // no dsh package in this dlx slot
+        }
+      }
+    }
+  } catch {
+    // no dlx cache
+  }
+  return best
 }
 
 /** Resolve a command on PATH (returns the first match, or undefined). */

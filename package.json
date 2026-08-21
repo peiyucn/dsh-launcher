@@ -68,11 +68,11 @@
         "dsh.mode": {
           "type": "string",
           "enum": [
-            "npx",
+            "pnpm",
             "source"
           ],
-          "default": "npx",
-          "description": "How to run DeepSeek Harness: 'npx' runs 'npx @deepseek-ai/dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
+          "default": "pnpm",
+          "description": "How to run DeepSeek Harness: 'pnpm' runs 'pnpm dlx @deepseek-ai/dsh web'; 'source' runs a local checkout via tsx. Normally set with the mode pill in the panel."
         },
         "dsh.channel": {
           "type": "string",
@@ -81,7 +81,7 @@
             "next"
           ],
           "default": "latest",
-          "description": "Which npm dist-tag npx resolves for @deepseek-ai/dsh: 'latest' (stable) or 'next' (prereleases; rc.8 is published to 'next', choose it to run rc.8 via npx)."
+          "description": "Which dist-tag pnpm resolves for @deepseek-ai/dsh: 'latest' (stable) or 'next' (prereleases)."
         },
         "dsh.browser": {
           "type": "string",
