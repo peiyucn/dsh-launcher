@@ -974,8 +974,11 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   }
 
   // Mark the start in-flight from the very first await, so status refreshes
-  // keep the Start button grey instead of un-greying it mid-setup.
+  // keep the Start button grey instead of un-greying it mid-setup. Also clear
+  // any stale Stop request from a previous run — otherwise the source branch's
+  // stopRequested guard silently aborts every later start.
   starting = true
+  stopRequested = false
 
   await checkNodeOnce()
   if (nodeState === 'missing') {
