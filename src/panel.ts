@@ -152,7 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="runtime-label">dsh</span>
         <span class="runtime-value" id="dshVersion">—</span>
         <button class="mini-btn" id="updateBtn" title="Update dsh" style="display:none">Update</button>
-        <button class="icon-btn" id="refreshBtn" title="Check for dsh updates">↓</button>
+        <button class="icon-btn" id="refreshBtn" title="Check for dsh updates">⟳</button>
       </div>
     </div>
     <div class="runtime-section">
@@ -295,7 +295,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const checkBtn = document.getElementById('refreshBtn')
       if (checkBtn) {
         checkBtn.disabled = !!status.checking
-        checkBtn.textContent = status.checking ? '…' : '↓'
+        checkBtn.textContent = status.checking ? '…' : '⟳'
       }
 
       // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
