@@ -152,7 +152,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="runtime-label">dsh</span>
         <span class="runtime-value" id="dshVersion">—</span>
         <button class="mini-btn" id="updateBtn" title="Update dsh" style="display:none">Update</button>
-        <button class="mini-btn" id="refreshBtn" title="Check for dsh updates">Check update</button>
+        <button class="mini-btn" id="refreshBtn" title="Check for dsh updates">Check updates</button>
       </div>
     </div>
     <div class="runtime-section">
@@ -413,8 +413,17 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     document.getElementById('refreshBtn').addEventListener('click', () => {
       if (refreshingReqs) return
       refreshingReqs = true
-      document.getElementById('refreshBtn').classList.add('spinning')
+      const btn = document.getElementById('refreshBtn')
+      btn.disabled = true
+      btn.textContent = 'Checking…'
       vscode.postMessage({ command: 'refreshRequirements' })
+      // Re-enable after a fixed window; the outcome arrives via the status
+      // update (Update button + console), not this trigger button.
+      setTimeout(() => {
+        refreshingReqs = false
+        btn.disabled = false
+        btn.textContent = 'Check updates'
+      }, 5000)
     })
     let refreshingBalance = false
     document.getElementById('balanceBtn').addEventListener('click', () => {
@@ -457,10 +466,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (!m || m.type !== 'update') return
       gotUpdate = true
       document.getElementById('loadingOverlay').classList.add('hidden')
-      if (refreshingReqs) {
-        refreshingReqs = false
-        document.getElementById('refreshBtn').classList.remove('spinning')
-      }
       if (refreshingBalance) {
         refreshingBalance = false
         document.getElementById('balanceBtn').disabled = false
@@ -516,7 +521,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         await clearRequirementsCaches()
         {
           const st = await currentStatus()
-          addActivity(st.update && st.update.hasUpdate ? `✓ Update available → ${st.update.label}` : '✓ dsh is up to date')
+          addActivity(
+            !st.dshVersion
+              ? 'ℹ dsh is not installed yet — use Install & Start'
+              : st.update && st.update.hasUpdate
+                ? `✓ Update available → ${st.update.label}`
+                : '✓ dsh is up to date',
+          )
         }
         finishBusy()
         break
