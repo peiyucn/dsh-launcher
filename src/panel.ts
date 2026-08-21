@@ -295,7 +295,8 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const checkBtn = document.getElementById('refreshBtn')
       if (checkBtn) {
         checkBtn.disabled = !!status.checking
-        checkBtn.textContent = status.checking ? '…' : '⟳'
+        checkBtn.textContent = '⟳'
+        checkBtn.classList.toggle('spinning', !!status.checking)
       }
 
       // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
@@ -422,7 +423,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const btn = document.getElementById('refreshBtn')
       if (btn.disabled) return
       btn.disabled = true
-      btn.textContent = '…'
+      btn.classList.add('spinning')
       vscode.postMessage({ command: 'refreshRequirements' })
       // Re-enabled by renderRuntime once status.checking goes false (same as Start).
     })
