@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseDsStatus, readCredentialFromFile, readDefaultModel } from '../out/ds.js'
+import { parseDsStatus, readCredentialFromFile, readDefaultModel } from '../src/ds.ts'
 
-function withTempFile(content, fn) {
+function withTempFile(content: string, fn: (file: string) => unknown): unknown {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-test-'))
   const file = join(dir, 'file.yaml')
   writeFileSync(file, content)

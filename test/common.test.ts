@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dshVersionAtLeast, isProcessAlive, maskPath, psQuote, quoteCmdArg, resolveDshHome, toEnglish } from '../out/common.js'
+import { dshVersionAtLeast, isProcessAlive, maskPath, psQuote, quoteCmdArg, resolveDshHome, toEnglish } from '../src/common.ts'
 
 test('dshVersionAtLeast compares prerelease versions numerically', () => {
   assert.equal(dshVersionAtLeast('0.1.0-rc.8', '0.1.0-rc.8'), true)
