@@ -20,9 +20,9 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 ## Features
 
 * **Start / Stop** — installs dsh into a launcher-managed location (first run), then runs `pnpm exec dsh web` and opens the web UI once it is ready.
-* **Source run (optional)** — run from a local checkout: set `dsh.path` to a deepseek-harness git clone. A fresh clone works — on first start the extension offers to run `pnpm install` + build for you.
+* **Source run** — clones deepseek-harness automatically into a managed location and runs it (a custom `dsh.path` overrides the clone location). On first start it also runs `pnpm install` + build.
 * **Dashboard panel** — server status, a live console (with clickable log files), the official DeepSeek API status with Peak / Off-peak pricing, and your account balance.
-* **DSH Update** — source run only: click the refresh button (⟳) to check for updates; when one is available, an Update button labeled with the new version appears, and clicking it pulls the update.
+* **DSH Update** — click the refresh button (⟳) to check; when a new version is available, an Update button appears next to the dsh version (pkg reinstalls the latest, source pulls the checkout).
 * **Browser choice** — built-in or system browser.
 
 ## Usage
@@ -39,7 +39,7 @@ Settings → search "dsh":
 | dsh.channel | latest | dist-tag pnpm resolves: `latest` (stable) or `next` (prereleases) |
 | dsh.browser | built-in | `built-in` uses VS Code's Simple Browser; `external` opens the system browser |
 | dsh.hideConsole | true | Hide the server console window on Windows |
-| dsh.path | empty | Path to a deepseek-harness git clone for source mode (first start offers to build it) |
+| dsh.path | empty | Optional: path to an existing deepseek-harness clone for source mode. When empty, the extension clones the repo automatically. |
 | dsh.nodePath | empty | Path to node.exe; empty uses the node on PATH |
 | dsh.port | 3080 | Web UI port |
 | dsh.sourceDebug | false | Print module-loading progress in source mode (NODE_DEBUG=module, very verbose; console shows a periodic count, full detail in the server log) |
@@ -48,6 +48,7 @@ Settings → search "dsh":
 ## Notes
 
 * The default pnpm mode installs dsh with pnpm (the tool the dsh repo itself uses) into a managed location and runs it directly — npm's peer resolver can hang indefinitely on dsh's dependency graph, so `npx` is not offered.
+* The panel shows the `install` (where dsh lives) and `data` (`~/.dsh`) locations, and the dsh row has Update and 🗑 (uninstall) buttons.
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **API Status** card supports DeepSeek only for now — it only shows when a DeepSeek model is configured in dsh.

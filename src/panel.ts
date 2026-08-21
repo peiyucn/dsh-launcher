@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { actionSetBrowser, actionStart, actionStop, openUrl } from './actions'
-import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, readConfig, runDshUpdate, type ServerStatus } from './server'
+import { addActivity, applyMode, clearConsole, clearRequirementsCaches, currentStatus, dbg, fetchDshBalance, finishBusy, getActivity, getDsStatus, getDshBalance, hasDeepSeekModel, readConfig, runDshUninstall, runDshUpdate, type ServerStatus } from './server'
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -58,15 +58,16 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .dot.running { background: #2ea043; box-shadow: 0 0 0 3px rgba(46,160,67,.16); }
   .dot.working { background: #d29922; animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .3; } }
-  .status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
   .status-main { font-weight: 600; }
   .status-sub { color: var(--vscode-descriptionForeground); font-size: 11px; word-break: break-all; }
   .mode-toggle { display: flex; flex-direction: row; margin-left: auto; background: var(--vscode-input-background); border: 1px solid var(--vscode-panel-border); border-radius: 999px; padding: 2px; gap: 2px; flex: none; }
   .mode-option { border: none; border-radius: 999px; padding: 2px 8px; background: transparent; color: var(--vscode-descriptionForeground); cursor: pointer; font-size: 10px; font-weight: 600; font-family: inherit; transition: background .12s, color .12s; }
   .mode-option.active { background: #4D6BFE; color: #fff; }
-  .runtime-path-block { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
-  .runtime-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-  .runtime-label { flex: none; width: 30px; color: var(--vscode-descriptionForeground); font-size: 10px; opacity: .65; }
+  .runtime-section { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .runtime-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .runtime-label { flex: none; width: 52px; color: var(--vscode-descriptionForeground); font-size: 10px; opacity: .65; }
+  .runtime-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--vscode-foreground); }
   .runtime-path, .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; font-family: var(--vscode-editor-font-family); min-width: 0; cursor: pointer; }
   .runtime-path:hover, .runtime-data:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
   .runtime-path.missing { color: #d29922; }
@@ -88,9 +89,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .debug-pill { border: 1px solid var(--vscode-panel-border); border-radius: 999px; padding: 0 8px; font-size: 10px; font-weight: 600; line-height: 18px; cursor: pointer; background: transparent; color: var(--vscode-descriptionForeground); flex: none; font-family: inherit; }
   .debug-pill.on { color: #2ea043; border-color: rgba(46,160,67,.4); background: rgba(46,160,67,.12); }
   .console-header .mini-btn { flex: none; }
-  .req-header { display: flex; align-items: center; gap: 6px; }
-  .req-title { font-weight: 600; }
-  .req-hint { color: var(--vscode-descriptionForeground); font-size: 10px; margin-left: auto; }
   .icon-btn { background: transparent; border: none; border-radius: 4px; color: var(--vscode-foreground); cursor: pointer; padding: 2px 4px; font-size: 12px; flex: none; }
   .icon-btn:hover { color: var(--vscode-textLink-foreground); }
   .icon-btn.spinning { animation: spin 1s linear infinite; }
@@ -100,10 +98,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .loading-overlay.hidden { opacity: 0; pointer-events: none; }
   .loading-spinner { width: 28px; height: 28px; border: 3px solid var(--vscode-panel-border); border-top-color: #4D6BFE; border-radius: 50%; animation: spin 1s linear infinite; }
   .loading-text { color: var(--vscode-descriptionForeground); font-size: 12px; }
-  .req-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-  .req-name { width: 56px; flex: none; color: var(--vscode-descriptionForeground); }
-  .req-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-foreground); }
-  .req-mark { width: 16px; text-align: center; flex: none; }
+  .req-mark { width: 16px; text-align: center; flex: none; font-size: 11px; }
   .req-mark.ok { color: #3fb950; }
   .req-mark.missing { color: #f85149; }
   .mini-btn { background: transparent; border: 1px solid var(--vscode-panel-border); border-radius: 4px; color: var(--vscode-foreground); cursor: pointer; padding: 0 6px; font-size: 10px; font-weight: 500; flex: none; }
@@ -128,7 +123,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .ds-empty { font-size: 11px; color: var(--vscode-descriptionForeground); }
   .balance-row { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; margin-top: 2px; display: flex; align-items: center; gap: 8px; font-size: 11px; }
   .balance-value { color: var(--vscode-foreground); }
-  .update-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
   .footer { border-top: 1px solid var(--vscode-panel-border); padding-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
   .setting { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .setting select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: 12px; }
@@ -151,46 +145,40 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         <span class="status-main" id="statusText">Checking…</span>
         <span class="status-sub" id="statusSub"></span>
       </div>
+      <button class="icon-btn" id="refreshBtn" title="Re-check Node / dsh / updates">⟳</button>
       <div class="mode-toggle" id="modeToggle">
         <button class="mode-option" data-mode="pnpm" title="Install & run the published dsh via pnpm">pkg</button>
-        <button class="mode-option" data-mode="source" title="Run a local source checkout via tsx">src</button>
+        <button class="mode-option" data-mode="source" title="Clone & run the deepseek-harness source">src</button>
       </div>
     </div>
-    <div class="runtime-path-block" id="runtimePathBlock">
-      <div class="runtime-row" id="runtimeDataRow">
+    <div class="runtime-section">
+      <div class="runtime-row">
+        <span class="runtime-label">node</span>
+        <span class="req-mark" id="req-node">·</span>
+        <span class="runtime-value" id="nodeVersion">—</span>
+      </div>
+      <div class="runtime-row">
+        <span class="runtime-label">dsh</span>
+        <span class="req-mark" id="req-dsh">·</span>
+        <span class="runtime-value" id="dshVersion">—</span>
+        <button class="mini-btn" id="updateBtn" title="Update dsh" style="display:none">Update</button>
+        <button class="icon-btn" id="uninstallBtn" title="Uninstall dsh (delete the install / source checkout)">🗑</button>
+      </div>
+    </div>
+    <div class="runtime-section">
+      <div class="runtime-row">
+        <span class="runtime-label">install</span>
+        <span class="runtime-path" id="runtimePath"></span>
+      </div>
+      <div class="runtime-row">
         <span class="runtime-label">data</span>
         <span class="runtime-data" id="runtimeData"></span>
-      </div>
-      <div class="runtime-row" id="runtimePathRow">
-        <span class="runtime-label">path</span>
-        <span class="runtime-path" id="runtimePath"></span>
       </div>
     </div>
   </div>
   <div class="buttons">
     <button id="startBtn" data-cmd="start" class="primary" title="Start dsh and open the browser (or open a new tab when already running)">▶ Start</button>
     <button data-cmd="stop" class="secondary danger when-running" title="Stop the local dsh server">■ Stop</button>
-  </div>
-  <div class="card">
-    <div class="req-header">
-      <span class="req-title">Requirements</span>
-      <span class="req-hint" id="refreshHint"></span>
-      <button class="icon-btn" id="refreshBtn" title="Re-check Node / pnpm / DSH / updates">⟳</button>
-    </div>
-    <div class="req-row">
-      <span class="req-name">Node</span>
-      <span class="req-value" id="nodeVersion">—</span>
-      <span class="req-mark" id="req-node">·</span>
-    </div>
-    <div class="req-row">
-      <span class="req-name">DSH</span>
-      <span class="req-value" id="dshVersion">—</span>
-      <span class="req-mark" id="req-dsh">·</span>
-    </div>
-    <div class="update-row" id="updateRow" style="display:none">
-      <span class="req-name">Update</span>
-      <button class="mini-btn" id="updateBtn" title="Pull dsh update">Update</button>
-    </div>
   </div>
   <div class="card" id="dsCard">
     <div class="ds-header">
@@ -238,7 +226,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     const vscode = acquireVsCodeApi()
     vscode.postMessage({ command: 'ready' })
     const LOADING_TIMEOUT_MS = 6000
-    const REFRESH_HINT_MS = 2000
     const SPIN_INTERVAL_MS = 150
     const ELAPSED_INTERVAL_MS = 1000
     let gotUpdate = false
@@ -285,9 +272,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
       const startBtn = document.getElementById('startBtn')
-      const runtimePathRow = document.getElementById('runtimePathRow')
-      const runtimePath = document.getElementById('runtimePath')
-      const runtimeData = document.getElementById('runtimeData')
       if (starting) {
         const justStarted = startElapsed()
         if (justStarted) statusSub.textContent = 'Waited 0s'
@@ -307,47 +291,32 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       document.querySelectorAll('.mode-option').forEach((b) => {
         b.classList.toggle('active', b.dataset.mode === mode)
       })
-      // data is always shown (top row); the path row only exists in source
-      // mode and stays hidden under pnpm, where there is no local checkout.
-      runtimeData.textContent = status.dshHomeShort || '—'
-      runtimeData.title = status.dshHome || ''
-      if (mode === 'source') {
-        runtimePathRow.style.display = ''
-        if (!status.dshPath) {
-          // No checkout configured: invite the user to configure it
-          // (clicking opens the extension settings).
-          runtimePath.textContent = 'click to set dsh.path'
-          runtimePath.title = 'Open extension settings'
-          runtimePath.classList.add('missing')
-          runtimePath.dataset.openSettings = '1'
-        } else {
-          runtimePath.textContent = status.dshPathShort || ''
-          runtimePath.title = status.dshPath || ''
-          runtimePath.classList.remove('missing')
-          delete runtimePath.dataset.openSettings
-        }
-      } else {
-        runtimePathRow.style.display = 'none'
-      }
     }
 
-    function renderRequirements(status) {
+    function renderRuntime(status) {
       status = status || {}
-      document.getElementById('nodeVersion').textContent = status.nodeVersion || (status.node === 'missing' ? 'not found' : '—')
+      document.getElementById('nodeVersion').textContent = status.nodeVersion ? ('v' + status.nodeVersion) : (status.node === 'missing' ? 'not found' : '—')
       const dshMissingText = status.dsh === 'missing' ? (status.mode === 'pnpm' ? 'pnpm not found' : 'not found') : '—'
       document.getElementById('dshVersion').textContent = status.dshVersion ? ('v' + status.dshVersion) : dshMissingText
       setMark('req-node', status.node)
       setMark('req-dsh', status.dsh)
 
       const upd = status.update
-      const updateRow = document.getElementById('updateRow')
       const updateBtn = document.getElementById('updateBtn')
       if (upd && upd.hasUpdate) {
-        updateRow.style.display = ''
-        updateBtn.textContent = 'Update to ' + upd.label
+        updateBtn.style.display = ''
+        updateBtn.textContent = 'Update to ' + (upd.label || 'latest')
       } else {
-        updateRow.style.display = 'none'
+        updateBtn.style.display = 'none'
       }
+
+      // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
+      const runtimePath = document.getElementById('runtimePath')
+      runtimePath.textContent = status.dshPathShort || '—'
+      runtimePath.title = status.dshPath || ''
+      const runtimeData = document.getElementById('runtimeData')
+      runtimeData.textContent = status.dshHomeShort || '—'
+      runtimeData.title = status.dshHome || ''
     }
 
     function renderLogFiles(status) {
@@ -431,6 +400,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       })
     })
     document.getElementById('updateBtn').addEventListener('click', () => vscode.postMessage({ command: 'updateDsh' }))
+    document.getElementById('uninstallBtn').addEventListener('click', () => vscode.postMessage({ command: 'uninstallDsh' }))
     document.getElementById('dsOpenBtn').addEventListener('click', () => vscode.postMessage({ command: 'openStatus' }))
     document.getElementById('settingsBtn').addEventListener('click', () => vscode.postMessage({ command: 'openSettings' }))
     document.getElementById('clearConsoleBtn').addEventListener('click', () => vscode.postMessage({ command: 'clearConsole' }))
@@ -459,13 +429,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     })
 
     let refreshingReqs = false
-    let refreshHintTimer = undefined
-    function showRefreshHint(text, persistent) {
-      const el = document.getElementById('refreshHint')
-      el.textContent = text
-      if (refreshHintTimer) clearTimeout(refreshHintTimer)
-      if (!persistent) refreshHintTimer = setTimeout(() => { el.textContent = '' }, REFRESH_HINT_MS)
-    }
     document.getElementById('refreshBtn').addEventListener('click', () => {
       if (refreshingReqs) return
       refreshingReqs = true
@@ -516,7 +479,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       if (refreshingReqs) {
         refreshingReqs = false
         document.getElementById('refreshBtn').classList.remove('spinning')
-        showRefreshHint('✓', false)
       }
       if (refreshingBalance) {
         refreshingBalance = false
@@ -544,7 +506,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const dsCard = document.getElementById('dsCard')
       if (dsCard) dsCard.style.display = m.showDs === false ? 'none' : ''
       renderRunning(m.status)
-      renderRequirements(m.status)
+      renderRuntime(m.status)
       renderLogFiles(m.status)
       renderDebug(m.status)
       renderDs(m.dsStatus)
@@ -566,6 +528,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         break
       case 'updateDsh':
         await runDshUpdate()
+        break
+      case 'uninstallDsh':
+        await runDshUninstall()
         break
       case 'refreshRequirements':
         addActivity('↻ Re-checking requirements…', true)

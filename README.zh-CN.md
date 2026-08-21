@@ -20,9 +20,9 @@
 ## 功能
 
 * **启动 / 停止** — 把 dsh 装进 launcher 自管的目录（首次运行），之后通过 `pnpm exec dsh web` 运行并在就绪后打开 Web UI。
-* **源码运行（可选）** — 从本地仓库检出运行：把 `dsh.path` 设为 deepseek-harness 的 git clone 目录。刚 clone 下来也能直接用——首次启动时会提示自动执行 `pnpm install` + 构建。
+* **源码运行** — 自动把 deepseek-harness clone 到自管目录并运行（`dsh.path` 可覆盖 clone 位置）。首次启动还会自动执行 `pnpm install` + 构建。
 * **仪表盘面板** — 服务状态、实时控制台（含可点击的日志文件）、带峰谷时段标志的 DeepSeek 官方 API 状态以及你的账户余额。
-* **DSH 更新** — 仅源码运行：点击刷新按钮（⟳）检查新版本；有更新时会出现带新版本号的 Update 按钮，点击即可拉取更新。
+* **DSH 更新** — 点击刷新按钮（⟳）检查；有新版本时，dsh 版本号旁会出现 Update 按钮（pkg 重装最新版，source 拉取仓库）。
 * **浏览器选择** — 内置浏览器或系统浏览器。
 
 ## 使用方法
@@ -39,7 +39,7 @@
 | dsh.channel     | latest    | pnpm 解析的 dist-tag：`latest`（稳定）或 `next`（预发布）                  |
 | dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器；`external` 打开系统浏览器                 |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
-| dsh.path        | 空         | source 模式的 deepseek-harness 检出路径（首次启动会提示自动构建）                  |
+| dsh.path        | 空         | 可选：source 模式已有的 deepseek-harness 克隆路径；留空则扩展自动 clone 仓库         |
 | dsh.nodePath    | 空         | node.exe 路径；留空则使用 PATH 上的 node                              |
 | dsh.port        | 3080      | Web UI 端口                                                   |
 | dsh.sourceDebug | false     | source 模式打印模块加载进度（NODE_DEBUG=module，输出很多；console 显示周期性计数，完整明细在服务端日志） |
@@ -48,6 +48,7 @@
 ## 说明
 
 * 默认的 pnpm 模式用 pnpm（dsh 仓库自己用的工具）把 dsh 装进自管目录后直接运行；npm 的 peer 解析器在 dsh 的依赖图上可能无限挂起，所以不提供 `npx`。
+* 面板显示 `install`（dsh 本体位置）和 `data`（`~/.dsh`）两处路径，dsh 行带 Update 和 🗑（卸载）按钮。
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。
