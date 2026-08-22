@@ -193,6 +193,44 @@ export function installedDshVersion(installDir: string): string | undefined {
   return undefined
 }
 
+// --- official client build (the web UI brand shipped by published dsh) ---
+
+/** Build selector env var: dsh's root build embeds the official brand when set to the official profile. */
+export const DSH_BUILD_PROFILE_SELECTOR = 'DSH_BUILD_CLIENT_PROFILE'
+
+/** Public value dsh records in the client build record for official-profile builds. */
+export const DSH_CLIENT_BUILD_PROFILE_KEY = 'DSH_CLIENT_BUILD_PROFILE'
+
+/** The profile value that produces the official DeepSeek Harness brand. */
+export const DSH_BUILD_PROFILE_OFFICIAL = 'official'
+
+/** Relative path of dsh's client build record inside a checkout. */
+export const CLIENT_BUILD_RECORD_REL = path.join('.dsh-build', 'client-build-environment.json')
+
+/** Whether a checkout's root build ships the official profile (`build:official` script). */
+export function checkoutSupportsOfficialBuild(checkout: string): boolean {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'package.json'), 'utf8')) as { scripts?: Record<string, string> }
+    return typeof pkg.scripts?.['build:official'] === 'string'
+  } catch {
+    // not a readable manifest
+  }
+  return false
+}
+
+/** Whether a checkout's web client was built with the official DeepSeek Harness brand. */
+export function checkoutHasOfficialBrand(checkout: string): boolean {
+  try {
+    const record = JSON.parse(fs.readFileSync(path.join(checkout, CLIENT_BUILD_RECORD_REL), 'utf8')) as {
+      environment?: Record<string, string | undefined>
+    }
+    return record?.environment?.[DSH_CLIENT_BUILD_PROFILE_KEY] === DSH_BUILD_PROFILE_OFFICIAL
+  } catch {
+    // no build record yet
+  }
+  return false
+}
+
 /** Candidate pnpm.cmd shim locations on Windows (npm global bin, pnpm standalone installer). */
 export function windowsPnpmCandidates(env: Record<string, string | undefined>): string[] {
   const out: string[] = []

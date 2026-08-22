@@ -6,6 +6,8 @@ import * as vscode from 'vscode'
 import {
   ACTIVITY_MAX_LINES,
   DETECTION_CACHE_TTL_MS,
+  DSH_BUILD_PROFILE_OFFICIAL,
+  DSH_BUILD_PROFILE_SELECTOR,
   DSH_CLI_BIN,
   DSH_NO_OPEN_MIN_VERSION,
   HTTP_PROBE_TIMEOUT_MS,
@@ -19,6 +21,8 @@ import {
   STOP_POLL_INTERVAL_MS,
   STOP_POLL_PROBE_MS,
   canTransition,
+  checkoutHasOfficialBrand,
+  checkoutSupportsOfficialBuild,
   dshInstallDir,
   dshVersionAtLeast,
   findPnpm,
@@ -640,14 +644,18 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
     : { state: 'unknown', source: 'pnpm', path: '' }
 }
 
-/** Run a command in a visible VS Code terminal (used for updates). */
-async function runInTerminal(title: string, command: string): Promise<boolean> {
+/**
+ * Run a command in a visible VS Code terminal (used for setup and updates).
+ * `env` entries are merged into the terminal process environment, which is
+ * how the source-mode build requests dsh's official client profile.
+ */
+async function runInTerminal(title: string, command: string, env?: Record<string, string>): Promise<boolean> {
   const task = new vscode.Task(
     { type: 'dsh-shell' },
     vscode.TaskScope.Global,
     title,
     'DeepSeek Harness',
-    new vscode.ShellExecution(command),
+    new vscode.ShellExecution(command, env ? { env } : undefined),
   )
   const execution = await vscode.tasks.executeTask(task)
   return new Promise<boolean>((resolve) => {
@@ -955,45 +963,62 @@ function checkoutDepsStale(checkout: string): boolean {
 
 /**
  * Make a checkout runnable: install its deps when missing/stale, then build
- * the web client. A checkout this start just cloned (`freshClone`) is set up
- * automatically — the user already committed to the install by starting it,
- * so a second "setup?" prompt right after the clone only slows them down.
+ * the web client with dsh's official profile so the UI shows the same
+ * DeepSeek Harness brand as the packaged dsh. A checkout this start just
+ * cloned (`freshClone`) is set up automatically — the user already committed
+ * to the install by starting it, so a second "setup?" prompt right after the
+ * clone only slows them down.
  */
 async function ensureCheckoutReady(checkout: string, freshClone = false): Promise<boolean> {
   const stale = checkoutDepsStale(checkout)
-  if (checkoutReady(checkout) && !stale) return true
-  if (!freshClone) {
-    const pick = await vscode.window.showInformationMessage(
-      stale
-        ? 'This deepseek-harness checkout has outdated dependencies. Run `pnpm install` and `pnpm run build`?'
-        : 'This deepseek-harness checkout is not set up. Run `pnpm install` and `pnpm run build`?',
-      'Setup now',
-      'Cancel',
-    )
-    if (pick !== 'Setup now') {
-      // The setup prompt was dismissed: say so in the console instead of
-      // silently stopping after "Node.js detected".
-      addActivity('✗ Setup declined — the checkout needs pnpm install + build before dsh can start')
+  const depsReady = checkoutReady(checkout) && !stale
+  if (!depsReady) {
+    if (!freshClone) {
+      const pick = await vscode.window.showInformationMessage(
+        stale
+          ? 'This deepseek-harness checkout has outdated dependencies. Run `pnpm install` and `pnpm run build`?'
+          : 'This deepseek-harness checkout is not set up. Run `pnpm install` and `pnpm run build`?',
+        'Setup now',
+        'Cancel',
+      )
+      if (pick !== 'Setup now') {
+        // The setup prompt was dismissed: say so in the console instead of
+        // silently stopping after "Node.js detected".
+        addActivity('✗ Setup declined — the checkout needs pnpm install + build before dsh can start')
+        return false
+      }
+    } else {
+      addActivity('ℹ Fresh clone — running the one-time setup (pnpm install + build) automatically')
+    }
+    // The phase is already 'starting' (set at the top of ensureRunningUnlocked),
+    // so setup needs no extra flag handling — the panel spinner is driven by it.
+    addActivity(`▶ Setup: pnpm --dir "${checkout}" install`)
+    const installOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`))
+    if (!installOk) {
+      addActivity('✗ pnpm install failed')
+      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
       return false
     }
-  } else {
-    addActivity('ℹ Fresh clone — running the one-time setup (pnpm install + build) automatically')
   }
-  // The phase is already 'starting' (set at the top of ensureRunningUnlocked),
-  // so setup needs no extra flag handling — the panel spinner is driven by it.
-  addActivity(`▶ Setup: pnpm --dir "${checkout}" install`)
-  const installOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`))
-  if (!installOk) {
-    addActivity('✗ pnpm install failed')
-    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
-    return false
-  }
-  addActivity(`▶ Setup: pnpm --dir "${checkout}" run build`)
-  const buildOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm run build)', `pnpm --dir "${checkout}" run build`))
-  if (!buildOk) {
-    addActivity('✗ pnpm run build failed')
-    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
-    return false
+  // Build with the official profile whenever the current artifacts predate it.
+  // The build record makes this idempotent: a checkout built locally or set up
+  // by an older launcher version gets exactly one rebuild before the start.
+  const needsBrandBuild = checkoutSupportsOfficialBuild(checkout) && !checkoutHasOfficialBrand(checkout)
+  if (!depsReady || needsBrandBuild) {
+    if (depsReady) {
+      addActivity('ℹ Web UI lacks the official brand — rebuilding once so it matches the packaged dsh')
+    }
+    addActivity(`▶ Setup: pnpm --dir "${checkout}" run build (official brand)`)
+    const buildOk = await runInstalling(() => runInTerminal(
+      'Setup deepseek-harness (pnpm run build)',
+      `pnpm --dir "${checkout}" run build`,
+      { [DSH_BUILD_PROFILE_SELECTOR]: DSH_BUILD_PROFILE_OFFICIAL },
+    ))
+    if (!buildOk) {
+      addActivity('✗ pnpm run build failed')
+      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
+      return false
+    }
   }
   return checkoutReady(checkout)
 }

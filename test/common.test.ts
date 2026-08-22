@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { canTransition, dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, managedSourceDir, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, managedSourceDir, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('canTransition allows only valid server phase transitions', () => {
   assert.equal(canTransition('stopped', 'starting'), true)
@@ -133,4 +133,36 @@ test('resolveDshHome prefers DSH_HOME and falls back to ~/.dsh', () => {
   assert.ok(resolveDshHome().endsWith('.dsh'))
   if (prev === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = prev
+})
+
+test('checkoutSupportsOfficialBuild detects the build:official script', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-brand-supports-'))
+  try {
+    assert.equal(checkoutSupportsOfficialBuild(root), false)
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { build: 'tsx scripts/build.ts' } }))
+    assert.equal(checkoutSupportsOfficialBuild(root), false)
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { build: 'tsx scripts/build.ts', 'build:official': 'tsx scripts/build.ts --profile official' } }))
+    assert.equal(checkoutSupportsOfficialBuild(root), true)
+    writeFileSync(join(root, 'package.json'), '{not json')
+    assert.equal(checkoutSupportsOfficialBuild(root), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('checkoutHasOfficialBrand reads the build record profile', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-brand-record-'))
+  try {
+    assert.equal(checkoutHasOfficialBrand(root), false)
+    const dir = join(root, '.dsh-build')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'client-build-environment.json'), JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55' } }))
+    assert.equal(checkoutHasOfficialBrand(root), false)
+    writeFileSync(join(dir, 'client-build-environment.json'), JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55', DSH_CLIENT_BUILD_PROFILE: 'official' } }))
+    assert.equal(checkoutHasOfficialBrand(root), true)
+    writeFileSync(join(dir, 'client-build-environment.json'), '{not json')
+    assert.equal(checkoutHasOfficialBrand(root), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
