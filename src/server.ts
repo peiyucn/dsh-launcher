@@ -5,16 +5,20 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import * as vscode from 'vscode'
 import {
   ACTIVITY_MAX_LINES,
+  DEFAULT_PORT,
   DETECTION_CACHE_TTL_MS,
   DSH_BUILD_PROFILE_OFFICIAL,
   DSH_BUILD_PROFILE_SELECTOR,
   DSH_CLI_BIN,
   DSH_NO_OPEN_MIN_VERSION,
+  GIT_OP_TIMEOUT_MS,
   HTTP_PROBE_TIMEOUT_MS,
   LOG_RELOAD_LINES,
   LOG_TAIL_POLL_MS,
   MODULE_PROGRESS_EVERY,
   NODE_PROBE_TIMEOUT_MS,
+  PNPM_PROBE_TIMEOUT_MS,
+  PNPM_VIEW_TIMEOUT_MS,
   PORT_PROBE_TIMEOUT_MS,
   PORT_POLL_INTERVAL_MS,
   STOP_POLL_ATTEMPTS,
@@ -27,6 +31,7 @@ import {
   dshVersionAtLeast,
   findPnpm,
   installedDshVersion,
+  isDshInstallDirUsable,
   isProcessAlive,
   maskPath,
   pnpmSupportsDangerouslyAllowAllBuilds,
@@ -78,7 +83,6 @@ export interface ServerStatus {
   node: ConditionState
   dsh: ConditionState
   dshVersion: string
-  dshSource: string
   dshPath: string
   dshHome: string
   dshPathShort: string
@@ -104,6 +108,8 @@ export interface DshUpdate {
 
 let trackedChild: ChildProcess | undefined
 let trackedPid: number | undefined
+/** The in-flight setup/update terminal task, so Stop can terminate it. */
+let activeTerminalTask: vscode.TaskExecution | undefined
 let logPath = ''
 let consolePath = ''
 let busy: Promise<boolean> | undefined
@@ -153,7 +159,6 @@ let logTailOffset = 0
 let logTailBuffer = ''
 let moduleLoadCount = 0
 let dshVersion = ''
-let dshSource: '' | 'pnpm' | 'source' = ''
 let dshPath = ''
 let nodeVersion = ''
 
@@ -161,20 +166,26 @@ export function readConfig(): DshConfig {
   // Read the persisted settings every time: dsh.mode is the single source
   // of truth, so both the panel toggle and the Settings UI stay in sync.
   const c = vscode.workspace.getConfiguration('dsh')
+  // Clamp the port to the valid TCP range; an out-of-range value from Settings
+  // Sync or manual edits would otherwise make every probe throw.
+  const port = c.get<number>('port') ?? DEFAULT_PORT
   return {
     mode: c.get<string>('mode') === 'source' ? 'source' : 'pnpm',
     channel: c.get<string>('channel') === 'next' ? 'next' : 'latest',
     path: c.get<string>('path') ?? '',
     pkgPath: c.get<string>('pkgPath') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
-    port: c.get<number>('port') ?? 3080,
+    port: Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_PORT,
     sourceDebug: c.get<boolean>('sourceDebug') ?? false,
   }
 }
 
 /** Persist the run mode chosen in the panel toggle and apply it immediately. */
 export async function applyMode(mode: 'pnpm' | 'source'): Promise<void> {
+  // Both caches are mode-dependent: detection (pkg install vs source checkout)
+  // and the update check (registry vs git upstream).
   detectionCache = undefined
+  updateCache = undefined
   await vscode.workspace.getConfiguration('dsh').update('mode', mode, vscode.ConfigurationTarget.Global)
 }
 
@@ -336,7 +347,11 @@ async function isHttpReady(host: string, port: number, timeoutMs: number): Promi
   }
 }
 
-/** Whether Node.js is present and satisfies the harness engines range (^22.19 || >=24). */
+/** Node.js engines range the harness requires: ^22.19 || >=24. */
+const NODE_MIN_MAJOR = 24
+const NODE_22_MIN_MINOR = 19
+
+/** Whether Node.js is present and satisfies the harness engines range. */
 async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string }> {
   const result = await runFile(cfg.nodePath || 'node', ['--version'], NODE_PROBE_TIMEOUT_MS)
   const version = result.ok ? result.stdout.trim().replace(/^v/, '') : ''
@@ -345,7 +360,7 @@ async function checkNode(cfg: DshConfig): Promise<{ ok: boolean; version: string
   if (!match) return { ok: false, version }
   const major = Number(match[1])
   const minor = Number(match[2])
-  return { ok: major >= 24 || (major === 22 && minor >= 19), version }
+  return { ok: major >= NODE_MIN_MAJOR || (major === 22 && minor >= NODE_22_MIN_MINOR), version }
 }
 
 /** Memoized one-shot Node check, run once at extension activation. */
@@ -423,8 +438,8 @@ async function saveDshSetting(key: 'path' | 'pkgPath', value: string): Promise<v
 async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<string | undefined> {
   const spec = channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', pnpmCmd, 'view', spec, 'version'], 10_000)
-    : await runFile(pnpmCmd, ['view', spec, 'version'], 10_000)
+    ? await runFile('cmd', ['/c', pnpmCmd, 'view', spec, 'version'], PNPM_VIEW_TIMEOUT_MS)
+    : await runFile(pnpmCmd, ['view', spec, 'version'], PNPM_VIEW_TIMEOUT_MS)
   if (!result.ok) {
     // Keep the failure visible for diagnosis: registry outages and cmd
     // quoting problems both surface here as "unreachable" to the user.
@@ -486,6 +501,13 @@ async function preparePkgStart(cfg: DshConfig, pnpmCmd: string, allowBuild: bool
  * once the requested version is present.
  */
 async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: boolean, dir: string): Promise<boolean> {
+  // Refuse to install into a folder that holds other files: writing the
+  // pinned manifest there would destroy the user's package.json.
+  if (!isDshInstallDirUsable(dir)) {
+    addActivity(`✗ ${maskPath(dir)} is not empty — install into an empty or dedicated folder instead`)
+    void vscode.window.showErrorMessage(`DeepSeek Harness: ${dir} is not empty. Choose an empty or dedicated folder for the dsh install.`)
+    return false
+  }
   try {
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
@@ -499,12 +521,14 @@ async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: 
   }
   // The phase is already 'starting' (set at the top of ensureRunningUnlocked).
   addActivity(`▶ Installing dsh v${version} (pnpm install)…`)
-  const args = ['install', '--dir', quoteCmdArg(dir)]
+  const args = ['install', '--dir', dir]
   if (allowBuild) args.push('--dangerously-allow-all-builds')
-  const ok = await runInstalling(() => runInTerminal(`Install dsh v${version}`, `${pnpmCmd} ${args.join(' ')}`))
+  const ok = await runInstalling(() => runInTerminal(`Install dsh v${version}`, pnpmCmd, args))
   if (!ok || installedDshVersion(dir) !== version) {
-    addActivity('✗ dsh install failed — see the terminal output above')
-    void vscode.window.showErrorMessage('DeepSeek Harness: dsh install failed. Check the terminal output.')
+    if (serverPhase === 'starting') {
+      addActivity('✗ dsh install failed — see the terminal output above')
+      void vscode.window.showErrorMessage('DeepSeek Harness: dsh install failed. Check the terminal output.')
+    }
     return false
   }
   return true
@@ -512,8 +536,8 @@ async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: 
 /** The pnpm version string ('' on failure). */
 async function pnpmVersion(pnpmCmd: string): Promise<string> {
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', pnpmCmd, '--version'], 8_000)
-    : await runFile(pnpmCmd, ['--version'], 8_000)
+    ? await runFile('cmd', ['/c', pnpmCmd, '--version'], PNPM_PROBE_TIMEOUT_MS)
+    : await runFile(pnpmCmd, ['--version'], PNPM_PROBE_TIMEOUT_MS)
   return result.ok ? result.stdout.trim().split(/\r?\n/)[0]?.trim() ?? '' : ''
 }
 
@@ -533,10 +557,12 @@ async function ensurePnpmAvailable(): Promise<{ command: string; allowBuild: boo
   addActivity('✗ pnpm not found — installing it now (npm install -g pnpm)')
   // The phase is already 'starting' (set at the top of ensureRunningUnlocked).
   addActivity('▶ Installing pnpm (npm install -g pnpm)…')
-  const ok = await runInstalling(() => runInTerminal('Install pnpm', 'npm install -g pnpm'))
+  const ok = await runInstalling(() => runInTerminal('Install pnpm', 'npm', ['install', '-g', 'pnpm']))
   if (!ok) {
-    addActivity('✗ pnpm install failed — run `npm install -g pnpm` in a terminal, then try again')
-    void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Run "npm install -g pnpm" in a terminal, then try again.')
+    if (serverPhase === 'starting') {
+      addActivity('✗ pnpm install failed — run `npm install -g pnpm` in a terminal, then try again')
+      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Run "npm install -g pnpm" in a terminal, then try again.')
+    }
     return undefined
   }
   const after = await findPnpm()
@@ -593,10 +619,14 @@ async function ensureSourceCheckout(cfg: DshConfig): Promise<SourceCheckout | un
   dshState = 'missing'
   addActivity('✗ No dsh source checkout found — cloning deepseek-harness…')
   addActivity(`▶ Cloning deepseek-harness → ${chosen}`)
-  const ok = await runInstalling(() => runInTerminal('Clone deepseek-harness', `git clone https://github.com/deepseek-ai/deepseek-harness.git "${chosen}"`))
+  const ok = await runInstalling(() => runInTerminal('Clone deepseek-harness', 'git', ['clone', 'https://github.com/deepseek-ai/deepseek-harness.git', chosen]))
   if (!ok || !isDshCheckout(chosen)) {
-    addActivity('✗ clone failed — see the terminal output above')
-    void vscode.window.showErrorMessage('DeepSeek Harness: could not clone deepseek-harness. Check your network and git, then try again.')
+    // Suppress the failure report when Stop interrupted the clone: the user
+    // asked for it, so the terminal error is noise, not news.
+    if (serverPhase === 'starting') {
+      addActivity('✗ clone failed — see the terminal output above')
+      void vscode.window.showErrorMessage('DeepSeek Harness: could not clone deepseek-harness. Check your network and git, then try again.')
+    }
     return undefined
   }
   addActivity('✓ deepseek-harness cloned')
@@ -626,7 +656,6 @@ function detectDshVersion(cfg: DshConfig): void {
 
 interface DshDetection {
   state: ConditionState
-  source: '' | 'pnpm' | 'source'
   path: string
 }
 
@@ -634,41 +663,53 @@ interface DshDetection {
 async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
   if (cfg.mode === 'source') {
     const checkout = findSourceCheckout(cfg)
-    if (checkout) return { state: 'ok', source: 'source', path: checkout }
+    if (checkout) return { state: 'ok', path: checkout }
     // Not cloned yet; show the chosen path only once the clone has started
     // (the dir appears as soon as the user picks a location).
     const chosen = cfg.path && cfg.path.trim() !== '' ? cfg.path : managedSourceCheckout()
     return fs.existsSync(chosen)
-      ? { state: 'unknown', source: 'source', path: chosen }
-      : { state: 'unknown', source: 'source', path: '' }
+      ? { state: 'unknown', path: chosen }
+      : { state: 'unknown', path: '' }
   }
-  if (!(await findPnpm())) return { state: 'missing', source: '', path: '' }
+  if (!(await findPnpm())) return { state: 'missing', path: '' }
   const dir = pkgInstallDir(cfg)
   // 'ok' once installed; show the path as soon as it exists (install started).
-  if (pkgInstalledVersion(cfg) !== undefined) return { state: 'ok', source: 'pnpm', path: dir }
+  if (pkgInstalledVersion(cfg) !== undefined) return { state: 'ok', path: dir }
   return fs.existsSync(dir)
-    ? { state: 'unknown', source: 'pnpm', path: dir }
-    : { state: 'unknown', source: 'pnpm', path: '' }
+    ? { state: 'unknown', path: dir }
+    : { state: 'unknown', path: '' }
 }
 
 /**
  * Run a command in a visible VS Code terminal (used for setup and updates).
- * `env` entries are merged into the terminal process environment, which is
- * how the source-mode build requests dsh's official client profile.
+ * Arguments are passed as an array so VS Code quotes them for the active
+ * shell — paths never go through manual string interpolation, which breaks on
+ * `$`/backticks/parentheses in PowerShell and `%`/`&` in cmd. `env`
+ * entries are merged into the terminal process environment, which is how the
+ * source-mode build requests dsh's official client profile. The in-flight
+ * execution is tracked so Stop can terminate it mid-setup.
  */
-async function runInTerminal(title: string, command: string, env?: Record<string, string>): Promise<boolean> {
+async function runInTerminal(title: string, command: string, args: string[], env?: Record<string, string>): Promise<boolean> {
   const task = new vscode.Task(
     { type: 'dsh-shell' },
     vscode.TaskScope.Global,
     title,
     'DeepSeek Harness',
-    new vscode.ShellExecution(command, env ? { env } : undefined),
+    new vscode.ShellExecution(command, args, env ? { env } : undefined),
   )
-  const execution = await vscode.tasks.executeTask(task)
+  let execution: vscode.TaskExecution
+  try {
+    execution = await vscode.tasks.executeTask(task)
+  } catch {
+    addActivity(`✗ could not run "${title}" in a terminal`)
+    return false
+  }
+  activeTerminalTask = execution
   return new Promise<boolean>((resolve) => {
     const disposable = vscode.tasks.onDidEndTaskProcess((event) => {
       if (event.execution === execution) {
         disposable.dispose()
+        if (activeTerminalTask === execution) activeTerminalTask = undefined
         resolve(event.exitCode === 0)
       }
     })
@@ -724,7 +765,8 @@ function startLogTail(): void {
   logTailTimer = setInterval(() => pump(), LOG_TAIL_POLL_MS)
 }
 
-function stopLogTail(): void {
+/** Stop streaming the server log into the dashboard (safe to call on deactivate). */
+export function stopLogTail(): void {
   if (logTailTimer) {
     clearInterval(logTailTimer)
     logTailTimer = undefined
@@ -790,6 +832,7 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
   })
 
   child.once('error', (error) => {
+    trackedChild = undefined
     void vscode.window.showErrorMessage(`DeepSeek Harness: failed to start (${error.message}).`)
   })
   child.once('exit', () => {
@@ -804,7 +847,15 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
 function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell = false, env?: Record<string, string>): void {
   trackedPid = undefined
   moduleLoadCount = 0
-  fs.mkdirSync(path.dirname(logPath), { recursive: true })
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true })
+  } catch {
+    // Failing here used to escape as an unhandled rejection from the Start
+    // command; report it and abort the spawn instead.
+    addActivity('✗ Could not create the log folder — check write permissions under your home directory')
+    void vscode.window.showErrorMessage(`DeepSeek Harness: could not create ${path.dirname(logPath)}. Check write permissions.`)
+    return
+  }
   // Each start gets a fresh server log (dsh.clearServerLogOnStart, default on)
   // — otherwise output from every previous run accumulates (NODE_DEBUG=module
   // alone produced a ~90MB file) and mixes with the current run.
@@ -853,6 +904,7 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
   })
 
   child.once('error', (error) => {
+    trackedChild = undefined
     void vscode.window.showErrorMessage(`DeepSeek Harness: failed to start (${error.message}).`)
   })
   child.once('exit', () => {
@@ -910,8 +962,12 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
   while (true) {
     await sleep(PORT_POLL_INTERVAL_MS)
     // The user pressed Stop while starting: bail out quietly (Stop already
-    // reported its own outcome).
-    if (serverPhase === 'stopping') {
+    // reported its own outcome). Stop's kill request returns immediately, so
+    // by the time this wakes the phase is often already back at 'stopped' —
+    // checking only 'stopping' would miss it and spin forever (or report a
+    // running server nobody wants). Any phase other than 'starting' means the
+    // start was interrupted.
+    if (serverPhase !== 'starting') {
       finishBusy()
       return false
     }
@@ -1000,10 +1056,12 @@ async function ensureCheckoutReady(checkout: string, freshClone = false): Promis
     // The phase is already 'starting' (set at the top of ensureRunningUnlocked),
     // so setup needs no extra flag handling — the panel spinner is driven by it.
     addActivity(`▶ Setup: pnpm --dir "${checkout}" install`)
-    const installOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm install)', `pnpm --dir "${checkout}" install --frozen-lockfile`))
+    const installOk = await runInstalling(() => runInTerminal('Setup deepseek-harness (pnpm install)', 'pnpm', ['--dir', checkout, 'install', '--frozen-lockfile']))
     if (!installOk) {
-      addActivity('✗ pnpm install failed')
-      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
+      if (serverPhase === 'starting') {
+        addActivity('✗ pnpm install failed')
+        void vscode.window.showErrorMessage('DeepSeek Harness: pnpm install failed. Check the terminal output.')
+      }
       return false
     }
   }
@@ -1018,12 +1076,15 @@ async function ensureCheckoutReady(checkout: string, freshClone = false): Promis
     addActivity(`▶ Setup: pnpm --dir "${checkout}" run build (official brand)`)
     const buildOk = await runInstalling(() => runInTerminal(
       'Setup deepseek-harness (pnpm run build)',
-      `pnpm --dir "${checkout}" run build`,
+      'pnpm',
+      ['--dir', checkout, 'run', 'build'],
       { [DSH_BUILD_PROFILE_SELECTOR]: DSH_BUILD_PROFILE_OFFICIAL },
     ))
     if (!buildOk) {
-      addActivity('✗ pnpm run build failed')
-      void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
+      if (serverPhase === 'starting') {
+        addActivity('✗ pnpm run build failed')
+        void vscode.window.showErrorMessage('DeepSeek Harness: pnpm run build failed. Check the terminal output.')
+      }
       return false
     }
   }
@@ -1096,7 +1157,7 @@ export function ensureRunning(cfg: DshConfig = readConfig()): Promise<boolean> {
 async function findPortOwner(port: number): Promise<number | undefined> {
   if (process.platform === 'win32') {
     return new Promise((resolve) => {
-      execFile('netstat', ['-ano'], { windowsHide: true }, (error, stdout) => {
+      execFile('netstat', ['-ano'], { windowsHide: true, timeout: NODE_PROBE_TIMEOUT_MS }, (error, stdout) => {
         if (error) {
           resolve(undefined)
           return
@@ -1114,7 +1175,7 @@ async function findPortOwner(port: number): Promise<number | undefined> {
     })
   }
   return new Promise((resolve) => {
-    execFile('lsof', ['-ti', `tcp:${port}`], { windowsHide: true }, (error, stdout) => {
+    execFile('lsof', ['-ti', `tcp:${port}`], { windowsHide: true, timeout: NODE_PROBE_TIMEOUT_MS }, (error, stdout) => {
       if (error) {
         resolve(undefined)
         return
@@ -1140,7 +1201,7 @@ function killPid(pid: number): void {
 }
 
 /** Stop the server, killing the tracked child and/or whatever owns the port (no guard). */
-async function stopServerUnlocked(): Promise<boolean> {
+async function stopServerUnlocked(wasStarting: boolean): Promise<boolean> {
   const cfg = readConfig()
   const pids: number[] = []
   if (trackedPid) {
@@ -1153,12 +1214,15 @@ async function stopServerUnlocked(): Promise<boolean> {
     killPid(trackedChild.pid)
     trackedChild = undefined
   }
+  // A setup/update running in a terminal is not killed by the server tree:
+  // terminate it so the start flow can settle instead of holding the busy
+  // promise until the command finishes on its own.
+  void activeTerminalTask?.terminate()
   const owner = await findPortOwner(cfg.port)
   if (owner && owner !== process.pid) {
     pids.push(owner)
     killPid(owner)
   }
-  const wasStarting = serverPhase === 'starting' || serverPhase === 'installing'
   setServerPhase('stopped')
   stopLogTail()
   if (pids.length === 0) {
@@ -1186,8 +1250,12 @@ export function stopServer(): Promise<boolean> {
   // skip stopping). The phase makes the concurrent waitForPort bail out.
   // Rapid repeat clicks coalesce onto the one in-flight stop.
   if (stopInFlight) return stopInFlight
-  if (serverPhase === 'installing' || serverPhase === 'starting' || serverPhase === 'running') setServerPhase('stopping')
-  stopInFlight = stopServerUnlocked().finally(() => {
+  // Capture the pre-stop phase here: stopServerUnlocked runs after the phase
+  // has already been moved to 'stopping', so it can't tell a Setup interrupt
+  // from a plain stop anymore.
+  const wasStarting = serverPhase === 'installing' || serverPhase === 'starting'
+  if (wasStarting || serverPhase === 'running') setServerPhase('stopping')
+  stopInFlight = stopServerUnlocked(wasStarting).finally(() => {
     stopInFlight = undefined
   })
   return stopInFlight
@@ -1206,7 +1274,7 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
   }
   const checkout = findSourceCheckout(cfg)
   if (!checkout) return { hasUpdate: false, label: '' }
-  const fetchResult = await runFile('git', ['-C', checkout, 'fetch'])
+  const fetchResult = await runFile('git', ['-C', checkout, 'fetch'], GIT_OP_TIMEOUT_MS)
   if (!fetchResult.ok) {
     // Report the network failure instead of silently pretending there is no
     // update — the user should know the check could not run.
@@ -1214,13 +1282,13 @@ async function checkDshUpdateStatus(cfg: DshConfig): Promise<DshUpdate> {
     addActivity(`⚠ Update check failed (network) — ${last}`)
     return { hasUpdate: false, label: '' }
   }
-  const r = await runFile('git', ['-C', checkout, 'rev-list', '--count', 'HEAD..@{upstream}'])
+  const r = await runFile('git', ['-C', checkout, 'rev-list', '--count', 'HEAD..@{upstream}'], GIT_OP_TIMEOUT_MS)
   if (!r.ok) return { hasUpdate: false, label: '' }
   const count = Number(r.stdout.trim())
   if (!Number.isFinite(count) || count <= 0) return { hasUpdate: false, label: '' }
   // Prefer the upstream version number; fall back to the commit count.
   let label = `${count} commit${count === 1 ? '' : 's'}`
-  const v = await runFile('git', ['-C', checkout, 'show', '@{upstream}:apps/cli/package.json'])
+  const v = await runFile('git', ['-C', checkout, 'show', '@{upstream}:apps/cli/package.json'], GIT_OP_TIMEOUT_MS)
   if (v.ok) {
     try {
       const pkg = JSON.parse(v.stdout)
@@ -1260,7 +1328,7 @@ export async function runDshUpdate(): Promise<void> {
     return
   }
   addActivity('↑ Updating dsh (git pull)…')
-  const ok = await runInTerminal('Update DeepSeek Harness', `git -C "${checkout}" pull`)
+  const ok = await runInTerminal('Update DeepSeek Harness', 'git', ['-C', checkout, 'pull'])
   addActivity(ok ? '↑ dsh updated' : '↑ dsh update failed')
   if (ok) updateCache = undefined
 }
@@ -1282,7 +1350,6 @@ export async function currentStatus(): Promise<ServerStatus> {
   if (!detectionCache || now - detectionCache.at > DETECTION_CACHE_TTL_MS) {
     const dshDet = await detectDsh(cfg)
     dshState = dshDet.state
-    dshSource = dshDet.source
     dshPath = dshDet.path
     detectionCache = { dsh: dshDet, at: now }
     detectDshVersion(cfg)
@@ -1304,7 +1371,6 @@ export async function currentStatus(): Promise<ServerStatus> {
     node: nodeState,
     dsh: dshState,
     dshVersion,
-    dshSource,
     dshPath,
     dshHome,
     dshPathShort: maskPath(dshPath),

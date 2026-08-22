@@ -39,6 +39,13 @@ test('readCredentialFromFile returns undefined for a missing key or file', () =>
   assert.equal(readCredentialFromFile('KEY', 'C:\\nonexistent\\file.yaml'), undefined)
 })
 
+test('readCredentialFromFile ignores commented-out keys', () => {
+  const v = withTempFile('# DEEPSEEK_API_KEY: sk-commented\nDEEPSEEK_API_KEY: sk-active\n', (f) => readCredentialFromFile('DEEPSEEK_API_KEY', f))
+  assert.equal(v, 'sk-active')
+  const onlyCommented = withTempFile('# DEEPSEEK_API_KEY: sk-commented\n', (f) => readCredentialFromFile('DEEPSEEK_API_KEY', f))
+  assert.equal(onlyCommented, undefined)
+})
+
 test('parseDsStatus maps components, incidents and worst severity', () => {
   const json = {
     data: {

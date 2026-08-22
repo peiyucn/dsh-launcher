@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { dirname, join } from 'node:path'
+import { CLIENT_BUILD_RECORD_REL, DSH_CLIENT_BUILD_PROFILE_KEY, canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isDshInstallDirUsable, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('canTransition allows only valid server phase transitions', () => {
   assert.equal(canTransition('stopped', 'starting'), true)
@@ -142,14 +142,38 @@ test('checkoutHasOfficialBrand reads the build record profile', () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-brand-record-'))
   try {
     assert.equal(checkoutHasOfficialBrand(root), false)
-    const dir = join(root, '.dsh-build')
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, 'client-build-environment.json'), JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55' } }))
+    const record = join(root, CLIENT_BUILD_RECORD_REL)
+    mkdirSync(dirname(record), { recursive: true })
+    writeFileSync(record, JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55' } }))
     assert.equal(checkoutHasOfficialBrand(root), false)
-    writeFileSync(join(dir, 'client-build-environment.json'), JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55', DSH_CLIENT_BUILD_PROFILE: 'official' } }))
+    writeFileSync(record, JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55', [DSH_CLIENT_BUILD_PROFILE_KEY]: 'official' } }))
     assert.equal(checkoutHasOfficialBrand(root), true)
-    writeFileSync(join(dir, 'client-build-environment.json'), '{not json')
+    writeFileSync(record, '{not json')
     assert.equal(checkoutHasOfficialBrand(root), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('isDshInstallDirUsable accepts absent, empty and launcher-owned dirs only', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-usable-'))
+  try {
+    assert.equal(isDshInstallDirUsable(join(root, 'absent')), true)
+    const empty = join(root, 'empty')
+    mkdirSync(empty, { recursive: true })
+    assert.equal(isDshInstallDirUsable(empty), true)
+    const owned = join(root, 'owned')
+    mkdirSync(owned, { recursive: true })
+    writeFileSync(join(owned, 'package.json'), JSON.stringify({ name: 'dsh-install' }))
+    assert.equal(isDshInstallDirUsable(owned), true)
+    const foreign = join(root, 'foreign')
+    mkdirSync(foreign, { recursive: true })
+    writeFileSync(join(foreign, 'package.json'), JSON.stringify({ name: 'my-project' }))
+    assert.equal(isDshInstallDirUsable(foreign), false)
+    const dataOnly = join(root, 'data')
+    mkdirSync(dataOnly, { recursive: true })
+    writeFileSync(join(dataOnly, 'note.txt'), 'x')
+    assert.equal(isDshInstallDirUsable(dataOnly), false)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

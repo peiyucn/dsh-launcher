@@ -161,7 +161,9 @@ export function parseDsStatus(json: any): DsStatus {
 /** Read a credential from a flat name:value / name=value mapping (block or flow style). */
 export function readCredentialFromFile(name: string, file: string): string | undefined {
   try {
-    const text = fs.readFileSync(file, 'utf8')
+    const raw = fs.readFileSync(file, 'utf8')
+    // Drop whole-line comments: a commented-out key must not count as set.
+    const text = raw.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join('\n')
     // Whole-file scan: matches KEY: value / KEY= value in both block style
     // (one per line) and flow style ({ KEY: value }, which dsh writes), with
     // quoted or bare values.

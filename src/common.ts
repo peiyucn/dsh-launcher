@@ -43,8 +43,16 @@ export const STOP_POLL_PROBE_MS = 300
 export const DETECTION_CACHE_TTL_MS = 8_000
 export const HTTP_PROBE_TIMEOUT_MS = 2_000
 export const NODE_PROBE_TIMEOUT_MS = 8_000
+export const PNPM_PROBE_TIMEOUT_MS = 8_000
+export const PNPM_VIEW_TIMEOUT_MS = 10_000
+export const GIT_OP_TIMEOUT_MS = 10_000
 export const MODULE_PROGRESS_EVERY = 500
 export const LOG_TAIL_POLL_MS = 500
+
+// --- Defaults ---
+
+/** The port the web UI listens on when `dsh.port` is unset (mirrors package.json). */
+export const DEFAULT_PORT = 3080
 
 // --- Limits ---
 
@@ -174,6 +182,28 @@ export function installedDshVersion(installDir: string): string | undefined {
   return undefined
 }
 
+/**
+ * Whether a directory may be used as a managed dsh install target: absent,
+ * empty, already a launcher-written manifest (`dsh-install`), or already an
+ * installed dsh. Anything else may hold the user's own files, and installing
+ * into it would overwrite them.
+ */
+export function isDshInstallDirUsable(dir: string): boolean {
+  if (!fs.existsSync(dir)) return true
+  try {
+    if (fs.readdirSync(dir).length === 0) return true
+  } catch {
+    return false
+  }
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name?: string }
+    if (pkg?.name === 'dsh-install') return true
+  } catch {
+    // no manifest (or not ours)
+  }
+  return installedDshVersion(dir) !== undefined
+}
+
 // --- official client build (the web UI brand shipped by published dsh) ---
 
 /** Build selector env var: dsh's root build embeds the official brand when set to the official profile. */
@@ -239,7 +269,7 @@ export async function findPnpm(): Promise<string | undefined> {
 }
 
 /** Resolve a command on PATH (returns the first match, or undefined). */
-export async function findOnPath(cmd: string): Promise<string | undefined> {
+async function findOnPath(cmd: string): Promise<string | undefined> {
   const which = process.platform === 'win32' ? 'where' : 'which'
   const result = await runFile(which, [cmd], 8_000)
   if (!result.ok) return undefined

@@ -357,7 +357,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       list.innerHTML = html || '<div class="ds-empty">' + (ds.state === 'unknown' ? 'Status unavailable — check your network' : 'No component data') + '</div>'
       const inc = document.getElementById('dsIncidents')
       const incs = ds.incidents || []
-      inc.innerHTML = incs.map((i) => '<div class="ds-incident">⚠ ' + esc(i.title) + (i.status ? ' · ' + incidentLabel(i.status) : '') + '</div>').join('')
+      inc.innerHTML = incs.map((i) => '<div class="ds-incident">⚠ ' + esc(i.title) + (i.status ? ' · ' + esc(incidentLabel(i.status)) : '') + '</div>').join('')
       inc.style.display = incs.length ? '' : 'none'
     }
 
@@ -371,11 +371,13 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    // DeepSeek peak-billing windows, as UTC minutes since midnight.
+    const PEAK_WINDOWS_UTC_MIN = [[60, 240], [360, 600]]
     function renderPricing() {
       const el = document.getElementById('dsPricing')
       const now = new Date()
       const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes()
-      const peak = (utcMin >= 60 && utcMin < 240) || (utcMin >= 360 && utcMin < 600)
+      const peak = PEAK_WINDOWS_UTC_MIN.some(([start, end]) => utcMin >= start && utcMin < end)
       el.textContent = peak ? 'Peak' : 'Off-peak'
       el.className = 'ds-pricing ' + (peak ? 'peak' : 'offpeak')
       const local = (h) => {
@@ -645,7 +647,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         node: 'unknown',
         dsh: 'unknown',
         dshVersion: '',
-        dshSource: '',
         dshPath: '',
         dshHome: '',
         dshPathShort: '',
