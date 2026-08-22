@@ -12,12 +12,13 @@ All notable changes to this project will be documented in this file.
 - Stop now terminates in-flight setup commands (clone / install / build); stopping during a start no longer deadlocks later starts or briefly reports the server as running.
 - Added a `DSH Launcher Panel: Stop` command so the server can also be stopped from the command palette.
 - Source mode reuses an existing deepseek-harness checkout when the chosen install location already is one, instead of trying to clone into it; a non-empty, non-checkout folder now fails with a clear message.
+- pkg mode refuses to install dsh into a folder that already contains other files, so pointing `dsh.pkgPath` at an existing project can no longer overwrite its manifest.
 
 - The panel now distinguishes Installing (first-run setup) / Starting / Stopping states, driven by an explicit server lifecycle state machine (the internal `starting`/`stopRequested` flags are gone).
 - pkg run mode (default) installs dsh into a launcher-managed directory via `pnpm install` and runs `pnpm exec dsh web`, approving build scripts non-interactively (the same thing npm does by default). npx was dropped because npm's peer resolver hangs on dsh's dependency graph.
 - Source mode clones deepseek-harness automatically into a managed directory (`dsh.path` is an optional override) and runs it via tsx.
 - On the first install with no location configured, the user can pick the default or a custom folder (`dsh.pkgPath` / `dsh.path`); the install path is only shown once a location is chosen.
-- The panel shows status + dsh version (with Update and Check update buttons) + install + data together at the top (the separate Requirements card is gone); node and launcher versions sit at the bottom.
+- The panel shows status + dsh version (with Update and Check update buttons) + the install location (labeled `package` or `source` by mode) + data together at the top (the separate Requirements card is gone); node and launcher versions sit at the bottom.
 - The Start button reads "Install & Start" when dsh isn't installed yet.
 - Update is unified across modes (pkg reinstalls the latest, source pulls the checkout).
 - Log files live in the managed `logs` folder alongside the package/source dirs (previously under %TEMP%).
