@@ -7,6 +7,7 @@ import {
   ACTIVITY_MAX_LINES,
   DEFAULT_PORT,
   DETECTION_CACHE_TTL_MS,
+  DSH_INSTALL_MANIFEST_NAME,
   DSH_BUILD_PROFILE_OFFICIAL,
   DSH_BUILD_PROFILE_SELECTOR,
   DSH_NO_OPEN_MIN_VERSION,
@@ -14,6 +15,7 @@ import {
   HTTP_PROBE_TIMEOUT_MS,
   LOG_RELOAD_LINES,
   LOG_TAIL_POLL_MS,
+  MAX_PORT,
   MODULE_PROGRESS_EVERY,
   NODE_PROBE_TIMEOUT_MS,
   PNPM_PROBE_TIMEOUT_MS,
@@ -175,7 +177,7 @@ export function readConfig(): DshConfig {
     path: c.get<string>('path') ?? '',
     pkgPath: c.get<string>('pkgPath') ?? '',
     nodePath: c.get<string>('nodePath') ?? '',
-    port: Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_PORT,
+    port: Number.isInteger(port) && port > 0 && port <= MAX_PORT ? port : DEFAULT_PORT,
     sourceDebug: c.get<boolean>('sourceDebug') ?? false,
   }
 }
@@ -272,7 +274,9 @@ function appendOutput(line: string): void {
   displayLine(line)
   const trimmed = line.trimEnd()
   if (!trimmed) return
-  fs.appendFile(logPath, trimmed + '\n', () => {})
+  fs.appendFile(logPath, trimmed + '\n', (error) => {
+    if (error) dbg(`server log append failed: ${error.message}`)
+  })
 }
 
 /** The panel activity feed (Start/Stop command dynamics), newest last. */
@@ -377,8 +381,8 @@ export function checkNodeOnce(): Promise<void> {
       nodeState = r.ok ? 'ok' : 'missing'
       nodeVersion = r.version
       if (!r.ok) {
-        addActivity('✗ Node.js not found (need 22.19+ or >=24)')
-        void vscode.window.showErrorMessage('DeepSeek Harness requires Node.js 22.19+ (or >= 24). Install it from https://nodejs.org and restart VS Code.')
+        addActivity(`✗ Node.js not found (need 22.${NODE_22_MIN_MINOR}+ or >=${NODE_MIN_MAJOR})`)
+        void vscode.window.showErrorMessage(`DeepSeek Harness requires Node.js 22.${NODE_22_MIN_MINOR}+ (or >= ${NODE_MIN_MAJOR}). Install it from https://nodejs.org and restart VS Code.`)
       }
     })()
   }
@@ -441,7 +445,7 @@ async function saveDshSetting(key: 'path' | 'pkgPath', value: string): Promise<v
 async function latestDshVersion(channel: DshChannel, pnpmCmd = 'pnpm'): Promise<string | undefined> {
   const spec = channel === 'next' ? '@deepseek-ai/dsh@next' : '@deepseek-ai/dsh'
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', pnpmCmd, 'view', spec, 'version'], PNPM_VIEW_TIMEOUT_MS)
+    ? await runFile('cmd', ['/c', quoteCmdArg(pnpmCmd), 'view', spec, 'version'], PNPM_VIEW_TIMEOUT_MS)
     : await runFile(pnpmCmd, ['view', spec, 'version'], PNPM_VIEW_TIMEOUT_MS)
   if (!result.ok) {
     // Keep the failure visible for diagnosis: registry outages and cmd
@@ -514,7 +518,7 @@ async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: 
   try {
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
-      name: 'dsh-install',
+      name: DSH_INSTALL_MANIFEST_NAME,
       private: true,
       dependencies: { '@deepseek-ai/dsh': version },
     }, null, 2) + '\n')
@@ -539,7 +543,7 @@ async function ensureDshInstalled(version: string, pnpmCmd: string, allowBuild: 
 /** The pnpm version string ('' on failure). */
 async function pnpmVersion(pnpmCmd: string): Promise<string> {
   const result = process.platform === 'win32'
-    ? await runFile('cmd', ['/c', pnpmCmd, '--version'], PNPM_PROBE_TIMEOUT_MS)
+    ? await runFile('cmd', ['/c', quoteCmdArg(pnpmCmd), '--version'], PNPM_PROBE_TIMEOUT_MS)
     : await runFile(pnpmCmd, ['--version'], PNPM_PROBE_TIMEOUT_MS)
   return result.ok ? result.stdout.trim().split(/\r?\n/)[0]?.trim() ?? '' : ''
 }
@@ -703,21 +707,25 @@ async function runInTerminal(title: string, command: string, args: string[], env
     'DeepSeek Harness',
     new vscode.ShellExecution(command, args, env ? { env } : undefined),
   )
-  let execution: vscode.TaskExecution
-  try {
-    execution = await vscode.tasks.executeTask(task)
-  } catch {
-    addActivity(`✗ could not run "${title}" in a terminal`)
-    return false
-  }
-  activeTerminalTask = execution
   return new Promise<boolean>((resolve) => {
+    let execution: vscode.TaskExecution | undefined
+    // Attach the end listener BEFORE executing: a task that finished before
+    // the listener would never resolve this promise, leaving the start flow
+    // (and the busy coalescing lock) hanging forever.
     const disposable = vscode.tasks.onDidEndTaskProcess((event) => {
-      if (event.execution === execution) {
+      if (execution !== undefined && event.execution === execution) {
         disposable.dispose()
         if (activeTerminalTask === execution) activeTerminalTask = undefined
         resolve(event.exitCode === 0)
       }
+    })
+    void vscode.tasks.executeTask(task).then((ex) => {
+      execution = ex
+      activeTerminalTask = ex
+    }, () => {
+      disposable.dispose()
+      addActivity(`✗ could not run "${title}" in a terminal`)
+      resolve(false)
     })
   })
 }
@@ -805,7 +813,8 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
   const rest = args.map(quoteCmdArg).join(' ')
   let run = rest ? `${program} ${rest}` : program
   if (env) {
-    const setEnv = Object.entries(env).map(([k, v]) => `set ${k}=${v}`).join('&& ')
+    // The quoted `set "K=V"` form keeps cmd metacharacters out of the value.
+    const setEnv = Object.entries(env).map(([k, v]) => `set "${k}=${v}"`).join('&& ')
     run = `${setEnv}&& ${run}`
   }
   const inner = `${run} >> ${quoteCmdArg(logPath)} 2>&1`
@@ -832,10 +841,12 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
     const m = /DSH_PID=(\d+)/.exec(pidBuf)
     if (m && trackedChild === child) trackedPid = Number(m[1])
   })
+  child.stdout?.on('error', () => {})
   child.stderr?.on('data', (chunk: Buffer) => {
     const text = chunk.toString().trim()
     if (text) addActivity(text)
   })
+  child.stderr?.on('error', () => {})
 
   child.once('error', (error) => {
     trackedChild = undefined
@@ -843,6 +854,15 @@ function spawnHiddenViaPowerShell(cmd: string, args: string[], cwd: string | und
   })
   child.once('exit', () => {
     trackedChild = undefined
+  })
+  // 'close' fires after stdout is fully delivered; this launcher exits right
+  // after Start-Process. If no PID was ever reported, the server never came
+  // up — fail the start instead of letting waitForPort spin forever.
+  child.once('close', () => {
+    if (trackedChild === child && trackedPid === undefined && serverPhase === 'starting') {
+      setServerPhase('stopped')
+      addActivity('✗ Server failed to launch — no process id was reported (see the log above)')
+    }
   })
 }
 
@@ -901,6 +921,7 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
     outBuffer = lines.pop() ?? ''
     for (const line of lines) appendOutput(line)
   })
+  child.stdout?.on('error', () => {})
   let errBuffer = ''
   child.stderr?.on('data', (chunk: Buffer) => {
     errBuffer += chunk.toString()
@@ -908,6 +929,7 @@ function spawnServer(cmd: string, args: string[], cwd: string | undefined, shell
     errBuffer = lines.pop() ?? ''
     for (const line of lines) appendOutput(line)
   })
+  child.stderr?.on('error', () => {})
 
   child.once('error', (error) => {
     trackedChild = undefined
@@ -953,7 +975,7 @@ function spawnPkg(cfg: DshConfig, pnpmCmd: string, version: string): void {
     // pnpm is a .cmd shim: drive it through cmd with the arguments array, so
     // Windows quoting keeps fallback shim paths (possibly containing spaces)
     // intact in both the hidden-console and the visible-console spawn paths.
-    spawnServer('cmd', ['/c', pnpmCmd, 'exec', 'dsh', ...webArgs], dir, false)
+    spawnServer('cmd', ['/c', quoteCmdArg(pnpmCmd), 'exec', 'dsh', ...webArgs], dir, false)
   } else {
     spawnServer(pnpmCmd, ['exec', 'dsh', ...webArgs], dir, false)
   }
@@ -980,6 +1002,13 @@ async function waitForPort(cfg: DshConfig): Promise<boolean> {
     // The port binds before the web app finishes booting; wait for an HTTP
     // response so the browser doesn't open onto a blank page.
     if (await isHttpReady(LOOPBACK_HOST, cfg.port, HTTP_PROBE_TIMEOUT_MS)) {
+      // Stop can complete while the HTTP probe is in flight (it takes up to
+      // HTTP_PROBE_TIMEOUT_MS): re-check the phase before flipping a stopped
+      // server back to 'running'.
+      if (serverPhase !== 'starting') {
+        finishBusy()
+        return false
+      }
       setServerPhase('running')
       const secs = Math.round((Date.now() - startedAt) / 1000)
       const dur = secs >= 60 ? `${Math.floor(secs / 60)}m${secs % 60}s` : `${secs}s`
@@ -1120,7 +1149,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
 
   await checkNodeOnce()
   if (nodeState === 'missing') {
-    addActivity('✗ Node.js not found (need 22.19+ or >=24)')
+    addActivity(`✗ Node.js not found (need 22.${NODE_22_MIN_MINOR}+ or >=${NODE_MIN_MAJOR})`)
     return false
   }
 
@@ -1196,7 +1225,9 @@ function killPid(pid: number): void {
   if (process.platform === 'win32') {
     // Kill the process tree: trackedPid is cmd.exe, and the node child that
     // `cmd /c` blocks on would otherwise survive and finish starting.
-    execFile('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true }, () => {})
+    execFile('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true, timeout: 5_000 }, (error) => {
+      if (error) dbg(`taskkill ${pid} failed: ${error.message}`)
+    })
     return
   }
   try {

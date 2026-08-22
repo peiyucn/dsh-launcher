@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { CLIENT_BUILD_RECORD_REL, DSH_CLIENT_BUILD_PROFILE_KEY, canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isDshCheckout, isDshInstallDirUsable, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { BUILD_OFFICIAL_SCRIPT, CLIENT_BUILD_RECORD_REL, DSH_BUILD_PROFILE_OFFICIAL, DSH_CLIENT_BUILD_PROFILE_KEY, DSH_INSTALL_MANIFEST_NAME, canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isDshCheckout, isDshInstallDirUsable, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('canTransition allows only valid server phase transitions', () => {
   assert.equal(canTransition('stopped', 'starting'), true)
@@ -148,7 +148,7 @@ test('checkoutSupportsOfficialBuild detects the build:official script', () => {
     assert.equal(checkoutSupportsOfficialBuild(root), false)
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { build: 'tsx scripts/build.ts' } }))
     assert.equal(checkoutSupportsOfficialBuild(root), false)
-    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { build: 'tsx scripts/build.ts', 'build:official': 'tsx scripts/build.ts --profile official' } }))
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { build: 'tsx scripts/build.ts', [BUILD_OFFICIAL_SCRIPT]: 'tsx scripts/build.ts --profile official' } }))
     assert.equal(checkoutSupportsOfficialBuild(root), true)
     writeFileSync(join(root, 'package.json'), '{not json')
     assert.equal(checkoutSupportsOfficialBuild(root), false)
@@ -165,7 +165,7 @@ test('checkoutHasOfficialBrand reads the build record profile', () => {
     mkdirSync(dirname(record), { recursive: true })
     writeFileSync(record, JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55' } }))
     assert.equal(checkoutHasOfficialBrand(root), false)
-    writeFileSync(record, JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55', [DSH_CLIENT_BUILD_PROFILE_KEY]: 'official' } }))
+    writeFileSync(record, JSON.stringify({ environment: { DSH_CLIENT_COMMIT_HASH: 'b150a55', [DSH_CLIENT_BUILD_PROFILE_KEY]: DSH_BUILD_PROFILE_OFFICIAL } }))
     assert.equal(checkoutHasOfficialBrand(root), true)
     writeFileSync(record, '{not json')
     assert.equal(checkoutHasOfficialBrand(root), false)
@@ -183,7 +183,7 @@ test('isDshInstallDirUsable accepts absent, empty and launcher-owned dirs only',
     assert.equal(isDshInstallDirUsable(empty), true)
     const owned = join(root, 'owned')
     mkdirSync(owned, { recursive: true })
-    writeFileSync(join(owned, 'package.json'), JSON.stringify({ name: 'dsh-install' }))
+    writeFileSync(join(owned, 'package.json'), JSON.stringify({ name: DSH_INSTALL_MANIFEST_NAME }))
     assert.equal(isDshInstallDirUsable(owned), true)
     const foreign = join(root, 'foreign')
     mkdirSync(foreign, { recursive: true })

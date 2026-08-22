@@ -551,21 +551,22 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       case 'setMode':
         if (message.value === 'pnpm' || message.value === 'source') {
           const st = await currentStatus()
-          if (st.running) {
-            // Confirm before switching so that cancelling keeps the current mode.
+          const active = st.running || st.starting || st.installing
+          if (active) {
+            // The snapshot can be stale by the time this runs: confirm for
+            // every active state so cancelling always keeps the current
+            // mode, and a start that completed mid-flight is never stopped
+            // without asking.
             const pick = await vscode.window.showInformationMessage(
-              `DeepSeek Harness is running — restart with ${message.value} mode?`,
-              'Restart',
+              `DeepSeek Harness is ${st.running ? 'running' : 'starting'} — switch to ${message.value} mode?`,
+              st.running ? 'Restart' : 'Switch',
               'Cancel',
             )
-            if (pick !== 'Restart') break
-            await applyMode(message.value)
+            if (pick === 'Cancel' || !pick) break
             await actionStop()
-            await actionStart()
+            await applyMode(message.value)
+            if (st.running) await actionStart()
           } else {
-            // A start or install may be in flight with the old mode: interrupt
-            // it so the new mode takes effect on the next Start.
-            if (st.starting || st.installing) await actionStop()
             await applyMode(message.value)
           }
         }

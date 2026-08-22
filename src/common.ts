@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process'
 // --- dsh ---
 
 /** Marker path that identifies a deepseek-harness source checkout. */
-export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
+const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
 
 /** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
 export function isDshCheckout(dir: string | undefined): boolean {
@@ -66,6 +66,15 @@ export const LOG_TAIL_POLL_MS = 500
 
 /** The port the web UI listens on when `dsh.port` is unset (mirrors package.json). */
 export const DEFAULT_PORT = 3080
+
+/** Highest valid TCP port; `dsh.port` values above this are clamped back to the default. */
+export const MAX_PORT = 65535
+
+/** Manifest name the launcher writes into its managed pkg install dir (a private marker). */
+export const DSH_INSTALL_MANIFEST_NAME = 'dsh-install'
+
+/** The root package.json script that builds with the official client profile. */
+export const BUILD_OFFICIAL_SCRIPT = 'build:official'
 
 // --- Limits ---
 
@@ -210,7 +219,7 @@ export function isDshInstallDirUsable(dir: string): boolean {
   }
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name?: string }
-    if (pkg?.name === 'dsh-install') return true
+    if (pkg?.name === DSH_INSTALL_MANIFEST_NAME) return true
   } catch {
     // no manifest (or not ours)
   }
@@ -235,7 +244,7 @@ export const CLIENT_BUILD_RECORD_REL = path.join('.dsh-build', 'client-build-env
 export function checkoutSupportsOfficialBuild(checkout: string): boolean {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(checkout, 'package.json'), 'utf8')) as { scripts?: Record<string, string> }
-    return typeof pkg.scripts?.['build:official'] === 'string'
+    return typeof pkg.scripts?.[BUILD_OFFICIAL_SCRIPT] === 'string'
   } catch {
     // not a readable manifest
   }
@@ -284,7 +293,7 @@ export async function findPnpm(): Promise<string | undefined> {
 /** Resolve a command on PATH (returns the first match, or undefined). */
 async function findOnPath(cmd: string): Promise<string | undefined> {
   const which = process.platform === 'win32' ? 'where' : 'which'
-  const result = await runFile(which, [cmd], 8_000)
+  const result = await runFile(which, [cmd], PNPM_PROBE_TIMEOUT_MS)
   if (!result.ok) return undefined
   const first = result.stdout.trim().split(/\r?\n/)[0]
   return first || undefined
