@@ -371,20 +371,28 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // DeepSeek peak-billing windows, as UTC minutes since midnight.
+    // DeepSeek peak-billing windows as UTC minutes since midnight (Beijing
+    // 09:00–12:00 and 14:00–18:00); off-peak is half the peak rate.
     const PEAK_WINDOWS_UTC_MIN = [[60, 240], [360, 600]]
+    const BJ_UTC_OFFSET_MS = 8 * 3600 * 1000
+    // Weekends (Beijing time) are billed at the off-peak rate all day,
+    // effective 2026-08-23 00:00 Beijing (= UTC 2026-08-22T16:00).
+    const WEEKEND_OFF_PEAK_START_MS = Date.UTC(2026, 7, 22, 16, 0)
     function renderPricing() {
       const el = document.getElementById('dsPricing')
       const now = new Date()
       const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes()
-      const peak = PEAK_WINDOWS_UTC_MIN.some(([start, end]) => utcMin >= start && utcMin < end)
+      // Day of week in Beijing time (UTC+8).
+      const bjDay = new Date(now.getTime() + BJ_UTC_OFFSET_MS).getUTCDay()
+      const weekendOffPeak = now.getTime() >= WEEKEND_OFF_PEAK_START_MS && (bjDay === 0 || bjDay === 6)
+      const peak = !weekendOffPeak && PEAK_WINDOWS_UTC_MIN.some(([start, end]) => utcMin >= start && utcMin < end)
       el.textContent = peak ? 'Peak' : 'Off-peak'
       el.className = 'ds-pricing ' + (peak ? 'peak' : 'offpeak')
       const local = (h) => {
         const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, 0))
         return String(d.getHours()).padStart(2, '0') + ':00'
       }
-      el.title = 'Peak: 01:00–04:00, 06:00–10:00 UTC (your time ' + local(1) + '–' + local(4) + ', ' + local(6) + '–' + local(10) + '); off-peak is half the peak rate'
+      el.title = 'Peak: 09:00–12:00, 14:00–18:00 Beijing (your time ' + local(1) + '–' + local(4) + ', ' + local(6) + '–' + local(10) + '); off-peak is half the peak rate; weekends are all off-peak'
     }
 
     document.querySelectorAll('button[data-cmd]').forEach((b) => {

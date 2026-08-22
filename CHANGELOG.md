@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - Source mode builds the web UI with dsh's official client profile, so the top-left shows the same DeepSeek Harness brand as the packaged dsh instead of "DSH Local Build <commit>"; a checkout built before this change is rebuilt once automatically.
 - The managed dirs (install/source/logs) now default to `<home>/.dsh-launcher-panel` (`%USERPROFILE%\.dsh-launcher-panel` on Windows) instead of the platform data dir (`%LOCALAPPDATA%` / Library/Application Support / XDG data home), where enterprise policies can block writes.
 - Choosing the install location on first install now writes it into `dsh.pkgPath` / `dsh.path` even when the default location is chosen, so the actual path is visible in Settings and stays pinned if the managed default ever changes.
+- The DeepSeek pricing pill follows the updated peak/off-peak rule: weekends (Beijing time) are billed at the off-peak rate all day, effective 2026-08-23 00:00 Beijing time.
 
 ## [0.1.6]
 
