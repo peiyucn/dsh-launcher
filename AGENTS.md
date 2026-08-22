@@ -125,6 +125,18 @@ VS Code 扩展「DSH Launcher Panel」：启动 DeepSeek Harness（dsh），并�
 
 ***
 
+## GitHub 操作
+
+* 对 GitHub 的所有操作一律用 **`gh` CLI**(本机已登录账户 `peiyucn`,token 含 `repo` + `workflow` 权限);不使用浏览器手动操作或第三方工具
+* 常用命令:
+  * 仓库信息/设置:`gh api repos/peiyucn/{repo} --jq ...`、`gh api -X PATCH repos/peiyucn/{repo} -f ...`
+  * PR:`gh pr create`、`gh pr view`、`gh pr merge --squash`
+  * Release:`gh release create vX.Y.Z`
+  * 安全功能状态:`gh api repos/peiyucn/{repo} --jq .security_and_analysis`(dsh-launcher-panel 已开启:CodeQL default setup、Dependabot alerts + security updates、secret scanning + push protection)
+* 网络:`gh api` 可直连 api.github.com(不需代理);`git push/fetch` 需要代理(127.0.0.1:7897)
+
+***
+
 ## CI 自动化
 
 | Workflow | 触发 | 作用 |
