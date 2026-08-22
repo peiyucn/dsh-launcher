@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { CLIENT_BUILD_RECORD_REL, DSH_CLIENT_BUILD_PROFILE_KEY, canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isDshInstallDirUsable, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { CLIENT_BUILD_RECORD_REL, DSH_CLIENT_BUILD_PROFILE_KEY, canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isDshCheckout, isDshInstallDirUsable, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('canTransition allows only valid server phase transitions', () => {
   assert.equal(canTransition('stopped', 'starting'), true)
@@ -78,6 +78,25 @@ test('dshBaseDir resolves the home directory on every platform', () => {
   assert.equal(dshBaseDir('win32', {}, 'C:\\Users\\me'), join('C:\\Users\\me', '.dsh-launcher-panel'))
   assert.equal(dshBaseDir('darwin', {}, '/Users/me'), join('/Users/me', '.dsh-launcher-panel'))
   assert.equal(dshBaseDir('linux', {}, '/home/me'), join('/home/me', '.dsh-launcher-panel'))
+})
+
+test('isDshCheckout recognises a checkout root and the cli package', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-checkout-'))
+  try {
+    assert.equal(isDshCheckout(join(root, 'absent')), false)
+    assert.equal(isDshCheckout(undefined), false)
+    const repo = join(root, 'repo')
+    mkdirSync(join(repo, 'apps', 'cli', 'src'), { recursive: true })
+    writeFileSync(join(repo, 'apps', 'cli', 'src', 'bin.ts'), '')
+    assert.equal(isDshCheckout(repo), true)
+    assert.equal(isDshCheckout(join(repo, 'apps', 'cli')), true)
+    const other = join(root, 'other')
+    mkdirSync(join(other, 'src'), { recursive: true })
+    writeFileSync(join(other, 'src', 'bin.ts'), '')
+    assert.equal(isDshCheckout(other), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('pnpmSupportsDangerouslyAllowAllBuilds gates on pnpm 10.16+', () => {

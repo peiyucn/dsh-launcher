@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - The DeepSeek pricing pill follows the updated peak/off-peak rule: weekends (Beijing time) are billed at the off-peak rate all day, effective 2026-08-23 00:00 Beijing time.
 - Stop now terminates in-flight setup commands (clone / install / build); stopping during a start no longer deadlocks later starts or briefly reports the server as running.
 - Added a `DSH Launcher Panel: Stop` command so the server can also be stopped from the command palette.
+- Source mode reuses an existing deepseek-harness checkout when the chosen install location already is one, instead of trying to clone into it; a non-empty, non-checkout folder now fails with a clear message.
 
 - The panel now distinguishes Installing (first-run setup) / Starting / Stopping states, driven by an explicit server lifecycle state machine (the internal `starting`/`stopRequested` flags are gone).
 - pkg run mode (default) installs dsh into a launcher-managed directory via `pnpm install` and runs `pnpm exec dsh web`, approving build scripts non-interactively (the same thing npm does by default). npx was dropped because npm's peer resolver hangs on dsh's dependency graph.

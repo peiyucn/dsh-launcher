@@ -9,7 +9,6 @@ import {
   DETECTION_CACHE_TTL_MS,
   DSH_BUILD_PROFILE_OFFICIAL,
   DSH_BUILD_PROFILE_SELECTOR,
-  DSH_CLI_BIN,
   DSH_NO_OPEN_MIN_VERSION,
   GIT_OP_TIMEOUT_MS,
   HTTP_PROBE_TIMEOUT_MS,
@@ -31,6 +30,7 @@ import {
   dshVersionAtLeast,
   findPnpm,
   installedDshVersion,
+  isDshCheckout,
   isDshInstallDirUsable,
   isProcessAlive,
   maskPath,
@@ -579,19 +579,6 @@ async function ensurePnpmAvailable(): Promise<{ command: string; allowBuild: boo
   return { command: after, allowBuild: pnpmSupportsDangerouslyAllowAllBuilds(await pnpmVersion(after)) }
 }
 
-/** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
-function isDshCheckout(dir: string | undefined): boolean {
-  if (!dir) return false
-  try {
-    if (fs.existsSync(path.join(dir, DSH_CLI_BIN))) return true
-    // Also accept pointing directly at the cli package (e.g. .../apps/cli).
-    if (fs.existsSync(path.join(dir, 'src', 'bin.ts')) && /apps[\\/]cli$/.test(dir)) return true
-    return false
-  } catch {
-    return false
-  }
-}
-
 /**
  * Locate the source checkout: the explicit `dsh.path` setting when it is a
  * valid checkout, else the launcher's managed clone.
@@ -619,6 +606,22 @@ async function ensureSourceCheckout(cfg: DshConfig): Promise<SourceCheckout | un
   // Persist the choice even when it is the managed default: the setting then
   // shows the actual clone path and pins it against future default changes.
   await saveDshSetting('path', chosen)
+  // The picked folder may already be a checkout (e.g. the user pointed at
+  // their own clone): reuse it instead of cloning into it, which git would
+  // refuse for a non-empty folder anyway.
+  if (isDshCheckout(chosen)) {
+    addActivity('✓ Existing deepseek-harness checkout found — reusing it')
+    return { path: chosen, cloned: false }
+  }
+  try {
+    if (fs.readdirSync(chosen).length > 0) {
+      addActivity(`✗ ${chosen} is not empty and is not a deepseek-harness checkout — pick an empty folder`)
+      void vscode.window.showErrorMessage('DeepSeek Harness: that folder already contains files. Pick an empty folder or an existing deepseek-harness checkout.')
+      return undefined
+    }
+  } catch {
+    // Unreadable or not created yet: let the clone attempt surface the error.
+  }
   dshState = 'missing'
   addActivity('✗ No dsh source checkout found — cloning deepseek-harness…')
   addActivity(`▶ Cloning deepseek-harness → ${chosen}`)

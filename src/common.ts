@@ -8,6 +8,19 @@ import { execFile } from 'node:child_process'
 /** Marker path that identifies a deepseek-harness source checkout. */
 export const DSH_CLI_BIN = path.join('apps', 'cli', 'src', 'bin.ts')
 
+/** Whether `dir` is a deepseek-harness source checkout (or the cli package itself). */
+export function isDshCheckout(dir: string | undefined): boolean {
+  if (!dir) return false
+  try {
+    if (fs.existsSync(path.join(dir, DSH_CLI_BIN))) return true
+    // Also accept pointing directly at the cli package (e.g. .../apps/cli).
+    if (fs.existsSync(path.join(dir, 'src', 'bin.ts')) && /apps[\\/]cli$/.test(dir)) return true
+    return false
+  } catch {
+    return false
+  }
+}
+
 /** dsh ≥ this version opens the system browser on its own; the launcher then passes `--no-open`. */
 export const DSH_NO_OPEN_MIN_VERSION = '0.1.0-rc.8'
 
