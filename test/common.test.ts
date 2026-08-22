@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshInstallDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, managedSourceDir, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
+import { join } from 'node:path'
+import { canTransition, checkoutHasOfficialBrand, checkoutSupportsOfficialBuild, dshBaseDir, dshVersionAtLeast, installedDshVersion, isProcessAlive, maskPath, pnpmSupportsDangerouslyAllowAllBuilds, psQuote, quoteCmdArg, resolveDshHome, toEnglish, windowsPnpmCandidates } from '../src/common.ts'
 
 test('canTransition allows only valid server phase transitions', () => {
   assert.equal(canTransition('stopped', 'starting'), true)
@@ -73,18 +73,11 @@ test('isProcessAlive reports own pid alive and an impossible pid dead', () => {
   assert.equal(isProcessAlive(999999999), false)
 })
 
-test('dshInstallDir resolves the platform data dir', () => {
-  assert.equal(dshInstallDir('darwin', {}, '/Users/me'), join('/Users/me', 'Library', 'Application Support', 'dsh-launcher-panel', 'install'))
-  assert.equal(dshInstallDir('linux', { XDG_DATA_HOME: '/xdg' }, '/home/me'), join('/xdg', 'dsh-launcher-panel', 'install'))
-  assert.equal(dshInstallDir('linux', {}, '/home/me'), join('/home/me', '.local', 'share', 'dsh-launcher-panel', 'install'))
-})
-
-test('dshInstallDir uses LOCALAPPDATA on win32', (t) => {
-  if (process.platform !== 'win32') {
-    t.skip('win32-only path')
-    return
-  }
-  assert.equal(dshInstallDir('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), join('C:\\Users\\me\\AppData\\Local', 'dsh-launcher-panel', 'install'))
+test('dshBaseDir resolves the home directory on every platform', () => {
+  assert.equal(dshBaseDir('win32', { USERPROFILE: 'C:\\Users\\me' }, 'C:\\Users\\me'), join('C:\\Users\\me', '.dsh-launcher-panel'))
+  assert.equal(dshBaseDir('win32', {}, 'C:\\Users\\me'), join('C:\\Users\\me', '.dsh-launcher-panel'))
+  assert.equal(dshBaseDir('darwin', {}, '/Users/me'), join('/Users/me', '.dsh-launcher-panel'))
+  assert.equal(dshBaseDir('linux', {}, '/home/me'), join('/home/me', '.dsh-launcher-panel'))
 })
 
 test('pnpmSupportsDangerouslyAllowAllBuilds gates on pnpm 10.16+', () => {
@@ -93,11 +86,6 @@ test('pnpmSupportsDangerouslyAllowAllBuilds gates on pnpm 10.16+', () => {
   assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('10.15.0'), false)
   assert.equal(pnpmSupportsDangerouslyAllowAllBuilds('9.15.4'), false)
   assert.equal(pnpmSupportsDangerouslyAllowAllBuilds(''), false)
-})
-
-test('managedSourceDir is a sibling of the managed install dir', () => {
-  const install = dshInstallDir('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me')
-  assert.equal(managedSourceDir('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me'), join(dirname(install), 'source'))
 })
 
 test('installedDshVersion reads the managed install version', () => {

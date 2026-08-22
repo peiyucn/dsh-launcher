@@ -142,44 +142,25 @@ export function pnpmSupportsDangerouslyAllowAllBuilds(version: string): boolean 
   return major > 10 || (major === 10 && minor >= 16)
 }
 
-// --- managed install ---
+// --- managed dirs (install / source / logs) ---
 
 /**
- * The launcher's managed dsh install directory — a private pnpm project the
- * launcher owns, so pkg mode needs no user-configured path. Persistent (not
- * temp): %LOCALAPPDATA% on Windows, Application Support on macOS, XDG data
- * home on Linux.
+ * The launcher's managed base dir: directly under the user's home directory
+ * (%USERPROFILE% on Windows), dot-prefixed like dsh's own `~/.dsh`. It lives
+ * outside the platform data dirs (LOCALAPPDATA / Library/Application Support /
+ * XDG data home) because those are frequent targets of enterprise policy and
+ * permission problems.
  */
-export function dshInstallDir(
+export function dshBaseDir(
   platform: NodeJS.Platform = process.platform,
   env: Record<string, string | undefined> = process.env,
   home: string = os.homedir(),
 ): string {
   if (platform === 'win32') {
-    const base = env.LOCALAPPDATA && env.LOCALAPPDATA.trim() !== '' ? env.LOCALAPPDATA : path.join(home, 'AppData', 'Local')
-    return path.join(base, 'dsh-launcher-panel', 'install')
+    const base = env.USERPROFILE && env.USERPROFILE.trim() !== '' ? env.USERPROFILE : home
+    return path.join(base, '.dsh-launcher-panel')
   }
-  if (platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'dsh-launcher-panel', 'install')
-  const base = env.XDG_DATA_HOME && env.XDG_DATA_HOME.trim() !== '' ? env.XDG_DATA_HOME : path.join(home, '.local', 'share')
-  return path.join(base, 'dsh-launcher-panel', 'install')
-}
-
-/** The launcher's managed source checkout dir (where dsh is cloned for source mode). */
-export function managedSourceDir(
-  platform: NodeJS.Platform = process.platform,
-  env: Record<string, string | undefined> = process.env,
-  home: string = os.homedir(),
-): string {
-  return path.join(path.dirname(dshInstallDir(platform, env, home)), 'source')
-}
-
-/** The launcher's log dir (client.log / server.log), alongside install and source. */
-export function dshLogDir(
-  platform: NodeJS.Platform = process.platform,
-  env: Record<string, string | undefined> = process.env,
-  home: string = os.homedir(),
-): string {
-  return path.join(path.dirname(dshInstallDir(platform, env, home)), 'logs')
+  return path.join(home, '.dsh-launcher-panel')
 }
 
 /** The installed @deepseek-ai/dsh version under a managed install dir (undefined when absent). */

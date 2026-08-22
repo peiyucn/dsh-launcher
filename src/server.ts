@@ -23,11 +23,10 @@ import {
   canTransition,
   checkoutHasOfficialBrand,
   checkoutSupportsOfficialBuild,
-  dshInstallDir,
+  dshBaseDir,
   dshVersionAtLeast,
   findPnpm,
   installedDshVersion,
-  managedSourceDir,
   isProcessAlive,
   maskPath,
   pnpmSupportsDangerouslyAllowAllBuilds,
@@ -373,7 +372,12 @@ export function checkNodeOnce(): Promise<void> {
 
 /** The launcher's default dsh install dir for pkg mode. */
 function managedInstallDir(): string {
-  return dshInstallDir()
+  return path.join(dshBaseDir(), 'install')
+}
+
+/** The launcher's managed source checkout dir (where dsh is cloned for source mode). */
+function managedSourceCheckout(): string {
+  return path.join(dshBaseDir(), 'source')
 }
 
 /** The pkg install dir: the user's dsh.pkgPath when set, else the managed default. */
@@ -564,7 +568,7 @@ function isDshCheckout(dir: string | undefined): boolean {
  */
 function findSourceCheckout(cfg: DshConfig): string | undefined {
   if (isDshCheckout(cfg.path)) return cfg.path
-  const managed = managedSourceDir()
+  const managed = managedSourceCheckout()
   return isDshCheckout(managed) ? managed : undefined
 }
 
@@ -580,9 +584,9 @@ async function ensureSourceCheckout(cfg: DshConfig): Promise<SourceCheckout | un
   const existing = findSourceCheckout(cfg)
   if (existing) return { path: existing, cloned: false }
   // Nothing cloned yet: let the user pick the default or a custom location.
-  const chosen = await chooseInstallDir('source', managedSourceDir())
+  const chosen = await chooseInstallDir('source', managedSourceCheckout())
   if (!chosen) return undefined
-  if (chosen !== managedSourceDir()) await saveDshSetting('path', chosen)
+  if (chosen !== managedSourceCheckout()) await saveDshSetting('path', chosen)
   dshState = 'missing'
   addActivity('✗ No dsh source checkout found — cloning deepseek-harness…')
   addActivity(`▶ Cloning deepseek-harness → ${chosen}`)
@@ -630,7 +634,7 @@ async function detectDsh(cfg: DshConfig): Promise<DshDetection> {
     if (checkout) return { state: 'ok', source: 'source', path: checkout }
     // Not cloned yet; show the chosen path only once the clone has started
     // (the dir appears as soon as the user picks a location).
-    const chosen = cfg.path && cfg.path.trim() !== '' ? cfg.path : managedSourceDir()
+    const chosen = cfg.path && cfg.path.trim() !== '' ? cfg.path : managedSourceCheckout()
     return fs.existsSync(chosen)
       ? { state: 'unknown', source: 'source', path: chosen }
       : { state: 'unknown', source: 'source', path: '' }

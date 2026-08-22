@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Source mode: a freshly cloned checkout is set up (`pnpm install` + build) automatically — the extra "Setup now?" prompt right after the clone is gone (existing checkouts still ask before being set up).
 - Source mode builds the web UI with dsh's official client profile, so the top-left shows the same DeepSeek Harness brand as the packaged dsh instead of "DSH Local Build <commit>"; a checkout built before this change is rebuilt once automatically.
+- The managed dirs (install/source/logs) now default to `<home>/.dsh-launcher-panel` (`%USERPROFILE%\.dsh-launcher-panel` on Windows) instead of the platform data dir (`%LOCALAPPDATA%` / Library/Application Support / XDG data home), where enterprise policies can block writes.
 
 ## [0.1.6]
 
@@ -16,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - The panel shows status + dsh version (with Update and Check update buttons) + install + data together at the top (the separate Requirements card is gone); node and launcher versions sit at the bottom.
 - The Start button reads "Install & Start" when dsh isn't installed yet.
 - Update is unified across modes (pkg reinstalls the latest, source pulls the checkout).
-- Log files live in `%LOCALAPPDATA%\dsh-launcher-panel\logs` alongside the managed install/source dirs (previously under %TEMP%).
+- Log files live in `%USERPROFILE%\.dsh-launcher-panel\logs` alongside the managed install/source dirs (previously under %TEMP%).
 - When pnpm is missing, Start installs it automatically without prompting; the DeepSeek API Status card shows model names without the trailing "api".
 - Fixed: source-mode setup counts as "starting"; Stop during setup is honoured; `--no-open` is decided from the exact version being run.
 - Tests are TypeScript (run via tsx against the source directly).

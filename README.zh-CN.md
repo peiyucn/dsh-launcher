@@ -53,7 +53,7 @@
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。
-* 日志文件：`%LOCALAPPDATA%\dsh-launcher-panel\logs\client.log`（启动器活动）与 `server.log`（服务端输出），和自管的 install/source 同目录；面板中均可点击打开。
+* 日志文件：`~/.dsh-launcher-panel/logs/client.log`（启动器活动）与 `server.log`（服务端输出），和自管的 install/source 同目录；面板中均可点击打开。自管目录直接放在用户主目录下（Windows 为 `%USERPROFILE%`）。
 * DSH在Windows下暂无法正常运行“极简模式”。
 
 ## 环境
