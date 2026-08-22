@@ -381,8 +381,8 @@ export function checkNodeOnce(): Promise<void> {
       nodeState = r.ok ? 'ok' : 'missing'
       nodeVersion = r.version
       if (!r.ok) {
-        addActivity(`✗ Node.js not found (need 22.${NODE_22_MIN_MINOR}+ or >=${NODE_MIN_MAJOR})`)
-        void vscode.window.showErrorMessage(`DeepSeek Harness requires Node.js 22.${NODE_22_MIN_MINOR}+ (or >= ${NODE_MIN_MAJOR}). Install it from https://nodejs.org and restart VS Code.`)
+        addActivity(`✗ Node.js not found (need 22.x >= 22.${NODE_22_MIN_MINOR} or >= ${NODE_MIN_MAJOR})`)
+        void vscode.window.showErrorMessage(`DeepSeek Harness requires Node.js 22.x (22.${NODE_22_MIN_MINOR} or later) or >= ${NODE_MIN_MAJOR}. Install it from https://nodejs.org and restart VS Code.`)
       }
     })()
   }
@@ -1149,7 +1149,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
 
   await checkNodeOnce()
   if (nodeState === 'missing') {
-    addActivity(`✗ Node.js not found (need 22.${NODE_22_MIN_MINOR}+ or >=${NODE_MIN_MAJOR})`)
+    addActivity(`✗ Node.js not found (need 22.x >= 22.${NODE_22_MIN_MINOR} or >= ${NODE_MIN_MAJOR})`)
     return false
   }
 
