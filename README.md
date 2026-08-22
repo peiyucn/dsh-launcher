@@ -37,7 +37,7 @@ Settings → search "dsh":
 |---|---|---|
 | dsh.mode | pnpm | `pnpm` installs dsh into a launcher-managed location and runs `pnpm exec dsh web`; `source` runs a local checkout via tsx |
 | dsh.channel | latest | dist-tag pnpm resolves: `latest` (stable) or `next` (prereleases) |
-| dsh.browser | built-in | `built-in` uses VS Code's Simple Browser; `external` opens the system browser |
+| dsh.browser | built-in | `built-in` uses VS Code's Simple Browser (falls back to the system browser if unavailable); `external` opens the system browser |
 | dsh.hideConsole | true | Hide the server console window on Windows |
 | dsh.path | empty | Optional: path to an existing deepseek-harness clone for source mode. When empty, the extension clones the repo automatically. |
 | dsh.pkgPath | empty | Optional: custom directory where pkg mode installs dsh. When empty, a managed default location is used. |
@@ -49,6 +49,7 @@ Settings → search "dsh":
 ## Notes
 
 * The default pnpm mode installs dsh with pnpm (the tool the dsh repo itself uses) into a managed location and runs it directly — npm's peer resolver can hang indefinitely on dsh's dependency graph, so `npx` is not offered. On the first install the chosen location (default or custom) is recorded in `dsh.pkgPath` / `dsh.path`, so it shows up in Settings and stays pinned.
+* The mode pill in the panel uses short labels: `pkg` = the pnpm mode, `src` = the source mode. When `dsh.path` does not point at an existing checkout, the launcher asks where to clone.
 * The panel shows where dsh lives (`package` in pkg mode, `source` in source mode) and the `data` (`~/.dsh`) locations; the dsh row has Update and Check updates buttons.
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
@@ -58,7 +59,7 @@ Settings → search "dsh":
 
 ## Environment
 
-* **Node.js** — 22.19+ (or >= 24)
+* **Node.js** — 22.19+ (the 22 line) or >= 24
 * **pnpm** — required for the default pnpm mode; if missing, the extension installs it automatically (`npm install -g pnpm`) on first start
 * **VS Code** — 1.85+
 * **PowerShell 7** — optional; recommended on Windows (dsh's tool subprocesses use `pwsh`; the launcher itself works with any shell)

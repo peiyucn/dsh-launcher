@@ -37,7 +37,7 @@
 | --------------- | --------- | ----------------------------------------------------------- |
 | dsh.mode        | pnpm      | `pnpm` 把 dsh 装进 launcher 自管的目录并运行 `pnpm exec dsh web`；`source` 通过 tsx 运行本地检出 |
 | dsh.channel     | latest    | pnpm 解析的 dist-tag：`latest`（稳定）或 `next`（预发布）                  |
-| dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器；`external` 打开系统浏览器                 |
+| dsh.browser     | built-in  | `built-in` 使用 VS Code 内置浏览器（不可用时回退到系统浏览器）；`external` 打开系统浏览器 |
 | dsh.hideConsole | true      | 在 Windows 上隐藏控制台                                            |
 | dsh.path        | 空         | 可选：source 模式已有的 deepseek-harness 克隆路径；留空则扩展自动 clone 仓库         |
 | dsh.pkgPath      | 空         | 可选：pkg 模式安装 dsh 的自定义目录；留空则用扩展自管默认位置                    |
@@ -49,16 +49,17 @@
 ## 说明
 
 * 默认的 pnpm 模式用 pnpm（dsh 仓库自己用的工具）把 dsh 装进自管目录后直接运行；npm 的 peer 解析器在 dsh 的依赖图上可能无限挂起，所以不提供 `npx`。首次安装时选择的位置（默认或自定义）会写入 `dsh.pkgPath` / `dsh.path`，在设置里可见并保持固定。
+* 面板上的模式切换 pill 用简写：`pkg` 即 pnpm 模式，`src` 即 source 模式。当 `dsh.path` 指向的不是已有检出时，启动器会询问 clone 位置。
 * 面板显示 dsh 本体位置（pkg 模式为 `package`，source 模式为 `source`）和 `data`（`~/.dsh`）两处路径；dsh 行带 Update 和 Check updates 按钮。
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。
-* 日志文件：`~/.dsh-launcher-panel/logs/client.log`（启动器活动）与 `server.log`（服务端输出），和自管的 package/source 同目录；面板中均可点击打开。自管目录直接放在用户主目录下（Windows 为 `%USERPROFILE%`）。
+* 日志文件：`~/.dsh-launcher-panel/logs/client.log`（启动器活动）与 `server.log`（服务端输出），与自管的 package/source 同位于 `.dsh-launcher-panel` 下的姊妹目录（logs 子目录）中；面板中均可点击打开。自管目录直接放在用户主目录下（Windows 为 `%USERPROFILE%`）。
 * DSH 在 Windows 下暂无法正常运行“极简模式”。
 
 ## 环境
 
-* **Node.js** — 22.19+（或 >= 24）
+* **Node.js** — 22.19+（22 系列）或 >= 24
 * **pnpm** — 默认 pnpm 模式需要；未安装时，扩展会在首次启动时自动帮你安装（`npm install -g pnpm`）
 * **VS Code** — 1.85+
 * **PowerShell 7** — 可选；Windows 下推荐安装（dsh 的工具子进程会用到 `pwsh`；启动器本身不依赖它）
