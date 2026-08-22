@@ -60,6 +60,11 @@
         "command": "dsh.start",
         "title": "Start",
         "category": "DSH Launcher Panel"
+      },
+      {
+        "command": "dsh.stop",
+        "title": "Stop",
+        "category": "DSH Launcher Panel"
       }
     ],
     "configuration": {

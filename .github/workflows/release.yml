@@ -22,7 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests (compiles TypeScript via tsc)
+      - name: Typecheck (tsc)
+        run: npm run compile
+
+      - name: Run tests
         run: npm test
 
       - name: Package extension

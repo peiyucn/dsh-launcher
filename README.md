@@ -61,7 +61,7 @@ Settings → search "dsh":
 * **Node.js** — 22.19+ (or >= 24)
 * **pnpm** — required for the default pnpm mode; if missing, the extension installs it automatically (`npm install -g pnpm`) on first start
 * **VS Code** — 1.85+
-* **PowerShell 7** — optional; recommended on Windows
+* **PowerShell 7** — optional; recommended on Windows (dsh's tool subprocesses use `pwsh`; the launcher itself works with any shell)
 
 ## License
 

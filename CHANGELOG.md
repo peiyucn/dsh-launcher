@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
 - The panel shows status + dsh version (with Update and Check update buttons) + install + data together at the top (the separate Requirements card is gone); node and launcher versions sit at the bottom.
 - The Start button reads "Install & Start" when dsh isn't installed yet.
 - Update is unified across modes (pkg reinstalls the latest, source pulls the checkout).
-- Log files live in `%USERPROFILE%\.dsh-launcher-panel\logs` alongside the managed install/source dirs (previously under %TEMP%).
+- Log files live in `%LOCALAPPDATA%\dsh-launcher-panel\logs` alongside the managed install/source dirs (previously under %TEMP%).
 - When pnpm is missing, Start installs it automatically without prompting; the DeepSeek API Status card shows model names without the trailing "api".
 - Fixed: source-mode setup counts as "starting"; Stop during setup is honoured; `--no-open` is decided from the exact version being run.
 - Tests are TypeScript (run via tsx against the source directly).

@@ -61,7 +61,7 @@
 * **Node.js** — 22.19+（或 >= 24）
 * **pnpm** — 默认 pnpm 模式需要；未安装时，扩展会在首次启动时自动帮你安装（`npm install -g pnpm`）
 * **VS Code** — 1.85+
-* **PowerShell 7** — 可选；Windows 下推荐安装
+* **PowerShell 7** — 可选；Windows 下推荐安装（dsh 的工具子进程会用到 `pwsh`；启动器本身不依赖它）
 
 ## License
 

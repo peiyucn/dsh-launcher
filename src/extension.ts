@@ -1,9 +1,9 @@
 import * as path from 'node:path'
 import * as vscode from 'vscode'
-import { actionStart } from './actions'
+import { actionStart, actionStop } from './actions'
 import { DshPanelProvider } from './panel'
 import { dshBaseDir } from './common'
-import { checkNodeOnce, currentStatus, dbg, registerConfigWatcher, setLogPath } from './server'
+import { checkNodeOnce, currentStatus, dbg, registerConfigWatcher, setLogPath, stopLogTail } from './server'
 
 const STATUS_REFRESH_INTERVAL_MS = 4_000
 const STATUS_SPIN_INTERVAL_MS = 150
@@ -68,9 +68,13 @@ export function activate(context: vscode.ExtensionContext): void {
     statusBar,
     { dispose: () => { clearInterval(statusTimer); stopSpinner() } },
     vscode.commands.registerCommand('dsh.start', () => actionStart()),
+    vscode.commands.registerCommand('dsh.stop', () => actionStop()),
   )
 }
 
 export function deactivate(): void {
-  // The server is intentionally left running. Stop it from the panel or command palette.
+  // The server is intentionally left running. Stop it from the panel or the
+  // DSH Launcher Panel: Stop command. The log tailer belongs to this host,
+  // so it stops with it (the server keeps writing the log file regardless).
+  stopLogTail()
 }
