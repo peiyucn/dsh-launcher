@@ -156,7 +156,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="runtime-section">
       <div class="runtime-row">
-        <span class="runtime-label">install</span>
+        <span class="runtime-label" id="runtimeLabel">package</span>
         <span class="runtime-path" id="runtimePath"></span>
       </div>
       <div class="runtime-row">
@@ -300,7 +300,10 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         checkBtn.textContent = '⟳'
       }
 
-      // install = where the dsh program lives (managed install / source checkout); data = ~/.dsh
+      // The row label follows the mode: package (published dsh) or source
+      // (checkout); data = ~/.dsh.
+      const runtimeLabel = document.getElementById('runtimeLabel')
+      if (runtimeLabel) runtimeLabel.textContent = status.mode === 'source' ? 'source' : 'package'
       const runtimePath = document.getElementById('runtimePath')
       runtimePath.textContent = status.dshPathShort || '—'
       runtimePath.title = status.dshPath || ''

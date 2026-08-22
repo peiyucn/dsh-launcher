@@ -385,9 +385,12 @@ export function checkNodeOnce(): Promise<void> {
   return nodeChecked
 }
 
-/** The launcher's default dsh install dir for pkg mode. */
-function managedInstallDir(): string {
-  return path.join(dshBaseDir(), 'install')
+/**
+ * The launcher's default dsh package dir for pkg mode — named `package` to
+ * mirror the `source` checkout dir: the published package vs the source.
+ */
+function managedPackageDir(): string {
+  return path.join(dshBaseDir(), 'package')
 }
 
 /** The launcher's managed source checkout dir (where dsh is cloned for source mode). */
@@ -395,9 +398,9 @@ function managedSourceCheckout(): string {
   return path.join(dshBaseDir(), 'source')
 }
 
-/** The pkg install dir: the user's dsh.pkgPath when set, else the managed default. */
+/** The pkg package dir: the user's dsh.pkgPath when set, else the managed default. */
 function pkgInstallDir(cfg: DshConfig): string {
-  return cfg.pkgPath && cfg.pkgPath.trim() !== '' ? cfg.pkgPath : managedInstallDir()
+  return cfg.pkgPath && cfg.pkgPath.trim() !== '' ? cfg.pkgPath : managedPackageDir()
 }
 
 /** The installed @deepseek-ai/dsh version for the current pkg install dir. */
@@ -473,7 +476,7 @@ async function preparePkgStart(cfg: DshConfig, pnpmCmd: string, allowBuild: bool
   // no custom path, let the user choose the default or a custom folder.
   let dir = pkgInstallDir(cfg)
   if (installedDshVersion(dir) === undefined && !cfg.pkgPath) {
-    const chosen = await chooseInstallDir('pkg', managedInstallDir())
+    const chosen = await chooseInstallDir('pkg', managedPackageDir())
     if (!chosen) return undefined
     // Persist the user's choice even when it is the managed default: the
     // setting then shows the actual install path and pins it against future

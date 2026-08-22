@@ -150,7 +150,7 @@ export function pnpmSupportsDangerouslyAllowAllBuilds(version: string): boolean 
   return major > 10 || (major === 10 && minor >= 16)
 }
 
-// --- managed dirs (install / source / logs) ---
+// --- managed dirs (package / source / logs) ---
 
 /**
  * The launcher's managed base dir: directly under the user's home directory

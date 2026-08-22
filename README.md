@@ -49,11 +49,11 @@ Settings → search "dsh":
 ## Notes
 
 * The default pnpm mode installs dsh with pnpm (the tool the dsh repo itself uses) into a managed location and runs it directly — npm's peer resolver can hang indefinitely on dsh's dependency graph, so `npx` is not offered. On the first install the chosen location (default or custom) is recorded in `dsh.pkgPath` / `dsh.path`, so it shows up in Settings and stays pinned.
-* The panel shows the `install` (where dsh lives) and `data` (`~/.dsh`) locations; the dsh row has Update and Check updates buttons.
+* The panel shows where dsh lives (`package` in pkg mode, `source` in source mode) and the `data` (`~/.dsh`) locations; the dsh row has Update and Check updates buttons.
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
 * The **API Status** card supports DeepSeek only for now — it only shows when a DeepSeek model is configured in dsh.
-* Log files: `~/.dsh-launcher-panel/logs/client.log` (launcher activity) and `server.log` (server output), alongside the managed install/source dirs; both are clickable in the panel. The managed dirs live directly under the user's home directory (`%USERPROFILE%` on Windows).
+* Log files: `~/.dsh-launcher-panel/logs/client.log` (launcher activity) and `server.log` (server output), alongside the managed package/source dirs; both are clickable in the panel. The managed dirs live directly under the user's home directory (`%USERPROFILE%` on Windows).
 * DSH cannot run "minimal mode" properly on Windows for now.
 
 ## Environment

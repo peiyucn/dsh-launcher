@@ -49,11 +49,11 @@
 ## 说明
 
 * 默认的 pnpm 模式用 pnpm（dsh 仓库自己用的工具）把 dsh 装进自管目录后直接运行；npm 的 peer 解析器在 dsh 的依赖图上可能无限挂起，所以不提供 `npx`。首次安装时选择的位置（默认或自定义）会写入 `dsh.pkgPath` / `dsh.path`，在设置里可见并保持固定。
-* 面板显示 `install`（dsh 本体位置）和 `data`（`~/.dsh`）两处路径；dsh 行带 Update 和 Check updates 按钮。
+* 面板显示 dsh 本体位置（pkg 模式为 `package`，source 模式为 `source`）和 `data`（`~/.dsh`）两处路径；dsh 行带 Update 和 Check updates 按钮。
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。
-* 日志文件：`~/.dsh-launcher-panel/logs/client.log`（启动器活动）与 `server.log`（服务端输出），和自管的 install/source 同目录；面板中均可点击打开。自管目录直接放在用户主目录下（Windows 为 `%USERPROFILE%`）。
+* 日志文件：`~/.dsh-launcher-panel/logs/client.log`（启动器活动）与 `server.log`（服务端输出），和自管的 package/source 同目录；面板中均可点击打开。自管目录直接放在用户主目录下（Windows 为 `%USERPROFILE%`）。
 * DSH在Windows下暂无法正常运行“极简模式”。
 
 ## 环境
