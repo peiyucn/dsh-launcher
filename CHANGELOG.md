@@ -13,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Added a `DSH Launcher Panel: Stop` command so the server can also be stopped from the command palette.
 - Source mode reuses an existing deepseek-harness checkout when the chosen install location already is one, instead of trying to clone into it; a non-empty, non-checkout folder now fails with a clear message.
 - pkg mode refuses to install dsh into a folder that already contains other files, so pointing `dsh.pkgPath` at an existing project can no longer overwrite its manifest.
-
 - The panel now distinguishes Installing (first-run setup) / Starting / Stopping states, driven by an explicit server lifecycle state machine (the internal `starting`/`stopRequested` flags are gone).
 - pkg run mode (default) installs dsh into a launcher-managed directory via `pnpm install` and runs `pnpm exec dsh web`, approving build scripts non-interactively (the same thing npm does by default). npx was dropped because npm's peer resolver hangs on dsh's dependency graph.
 - Source mode clones deepseek-harness automatically into a managed directory (`dsh.path` is an optional override) and runs it via tsx.
