@@ -460,10 +460,11 @@ async function preparePkgStart(cfg: DshConfig, pnpmCmd: string, allowBuild: bool
   if (installedDshVersion(dir) === undefined && !cfg.pkgPath) {
     const chosen = await chooseInstallDir('pkg', managedInstallDir())
     if (!chosen) return undefined
-    if (chosen !== managedInstallDir()) {
-      await saveDshSetting('pkgPath', chosen)
-      dir = chosen
-    }
+    // Persist the user's choice even when it is the managed default: the
+    // setting then shows the actual install path and pins it against future
+    // default-location changes.
+    await saveDshSetting('pkgPath', chosen)
+    dir = chosen
   }
   const installed = installedDshVersion(dir)
   if (installed === undefined) {
@@ -586,7 +587,9 @@ async function ensureSourceCheckout(cfg: DshConfig): Promise<SourceCheckout | un
   // Nothing cloned yet: let the user pick the default or a custom location.
   const chosen = await chooseInstallDir('source', managedSourceCheckout())
   if (!chosen) return undefined
-  if (chosen !== managedSourceCheckout()) await saveDshSetting('path', chosen)
+  // Persist the choice even when it is the managed default: the setting then
+  // shows the actual clone path and pins it against future default changes.
+  await saveDshSetting('path', chosen)
   dshState = 'missing'
   addActivity('✗ No dsh source checkout found — cloning deepseek-harness…')
   addActivity(`▶ Cloning deepseek-harness → ${chosen}`)

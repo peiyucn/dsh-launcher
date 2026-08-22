@@ -48,7 +48,7 @@ Settings → search "dsh":
 
 ## Notes
 
-* The default pnpm mode installs dsh with pnpm (the tool the dsh repo itself uses) into a managed location and runs it directly — npm's peer resolver can hang indefinitely on dsh's dependency graph, so `npx` is not offered.
+* The default pnpm mode installs dsh with pnpm (the tool the dsh repo itself uses) into a managed location and runs it directly — npm's peer resolver can hang indefinitely on dsh's dependency graph, so `npx` is not offered. On the first install the chosen location (default or custom) is recorded in `dsh.pkgPath` / `dsh.path`, so it shows up in Settings and stays pinned.
 * The panel shows the `install` (where dsh lives) and `data` (`~/.dsh`) locations; the dsh row has Update and Check updates buttons.
 * Start/stop is idempotent: it probes the port first and does not start twice.
 * Closing VS Code does not stop the server; stop it from the panel or command palette.
