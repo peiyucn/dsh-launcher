@@ -49,7 +49,7 @@
 ## 说明
 
 * 默认的 pnpm 模式用 pnpm（dsh 仓库自己用的工具）把 dsh 装进自管目录后直接运行；npm 的 peer 解析器在 dsh 的依赖图上可能无限挂起，所以不提供 `npx`。
-* 面板显示 `install`（dsh 本体位置）和 `data`（`~/.dsh`）两处路径，dsh 行带 Update 和 🗑（卸载）按钮。
+* 面板显示 `install`（dsh 本体位置）和 `data`（`~/.dsh`）两处路径；dsh 行带 Update 和 Check updates 按钮。
 * 启动/停止是幂等的：会先探测端口，不会重复启动。
 * 关闭 VS Code 不会停止服务；请从面板或命令面板停止。
 * **API Status** 卡片目前仅支持 DeepSeek — 只有在 dsh 里配置了 DeepSeek 模型时才会显示。

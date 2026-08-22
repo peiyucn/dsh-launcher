@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.6]
 
+- The panel now distinguishes Installing (first-run setup) / Starting / Stopping states, driven by an explicit server lifecycle state machine (the internal `starting`/`stopRequested` flags are gone).
 - pkg run mode (default) installs dsh into a launcher-managed directory via `pnpm install` and runs `pnpm exec dsh web`, approving build scripts non-interactively (the same thing npm does by default). npx was dropped because npm's peer resolver hangs on dsh's dependency graph.
 - Source mode clones deepseek-harness automatically into a managed directory (`dsh.path` is an optional override) and runs it via tsx.
 - On the first install with no location configured, the user can pick the default or a custom folder (`dsh.pkgPath` / `dsh.path`); the install path is only shown once a location is chosen.

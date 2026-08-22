@@ -67,6 +67,8 @@ export interface ServerStatus {
   starting: boolean
   /** First-run setup (download / clone / build) is in progress. */
   installing: boolean
+  /** A Stop is in progress (server is shutting down). */
+  stopping: boolean
   /** Whether an update check is in progress (drives the Check updates button). */
   checking: boolean
   url: string
@@ -990,6 +992,13 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     return true
   }
 
+  // A stop is still finishing: don't race it with a new start.
+  const phase = serverPhase
+  if (phase === 'stopping') {
+    addActivity('⚠ Stop is still in progress — wait a moment and try again')
+    return false
+  }
+
   // Enter the 'starting' phase from the very first await, so status refreshes
   // keep the Start button grey instead of un-greying it mid-setup.
   setServerPhase('starting')
@@ -1009,7 +1018,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
     }
     // Setup may have run while the user pressed Stop; honour that request
     // instead of starting a server nobody is waiting for.
-    if (serverPhase === 'stopping') return false
+    if (serverPhase !== 'starting') return false
     spawnSource(repoPath, cfg, dshVersion)
     return waitForPort(cfg)
   }
@@ -1021,7 +1030,7 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   if (!version) return false
   // The install may have run while the user pressed Stop; honour that request
   // instead of starting a server nobody is waiting for.
-  if (serverPhase === 'stopping') return false
+  if (serverPhase !== 'starting') return false
   spawnPkg(cfg, pnpmCmd.command, version)
   return waitForPort(cfg)
 }
@@ -1208,7 +1217,7 @@ export async function runDshUpdate(): Promise<void> {
   if (ok) updateCache = undefined
 }
 
-let detectionCache: { node: ConditionState; dsh: DshDetection; at: number } | undefined
+let detectionCache: { dsh: DshDetection; at: number } | undefined
 let updateCache: { update: DshUpdate; at: number } | undefined
 
 export async function currentStatus(): Promise<ServerStatus> {
@@ -1227,7 +1236,7 @@ export async function currentStatus(): Promise<ServerStatus> {
     dshState = dshDet.state
     dshSource = dshDet.source
     dshPath = dshDet.path
-    detectionCache = { node: nodeState, dsh: dshDet, at: now }
+    detectionCache = { dsh: dshDet, at: now }
     detectDshVersion(cfg)
   }
 
@@ -1239,8 +1248,9 @@ export async function currentStatus(): Promise<ServerStatus> {
   const dshHome = resolveDshHome()
   return {
     running,
-    starting: serverPhase === 'starting' || serverPhase === 'stopping',
+    starting: serverPhase === 'starting',
     installing: serverPhase === 'installing',
+    stopping: serverPhase === 'stopping',
     checking: checkingUpdates,
     url: uiUrl(cfg),
     node: nodeState,

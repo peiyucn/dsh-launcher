@@ -70,7 +70,6 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
   .runtime-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--vscode-foreground); }
   .runtime-path, .runtime-data { font-size: 11px; color: var(--vscode-descriptionForeground); word-break: break-all; font-family: var(--vscode-editor-font-family); min-width: 0; cursor: pointer; }
   .runtime-path:hover, .runtime-data:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
-  .runtime-path.missing { color: #d29922; }
   .buttons { display: flex; gap: 8px; }
   button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: background .12s, border-color .12s, color .12s; }
   button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); flex: 1; }
@@ -249,19 +248,20 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
       const running = !!(status.running)
       const starting = !!(status.starting)
       const installing = !!(status.installing)
+      const stopping = !!(status.stopping)
       // Stop must be reachable while starting/installing too, so a slow start
       // or first-run install can be interrupted.
-      document.querySelectorAll('.when-running').forEach((b) => { b.style.display = (running || starting || installing) ? '' : 'none' })
+      document.querySelectorAll('.when-running').forEach((b) => { b.style.display = (running || starting || installing || stopping) ? '' : 'none' })
       const dot = document.getElementById('dot')
       const statusText = document.getElementById('statusText')
       const statusSub = document.getElementById('statusSub')
       const startBtn = document.getElementById('startBtn')
-      if (starting || installing) {
+      if (starting || installing || stopping) {
         const justStarted = startElapsed()
         if (justStarted) statusSub.textContent = 'Waited 0s'
         dot.className = 'dot working'
-        statusText.textContent = installing ? 'Installing dsh…' : 'Starting DeepSeek Harness Web UI…'
-        startBtn.textContent = installing ? 'Installing…' : 'Starting…'
+        statusText.textContent = stopping ? 'Stopping…' : (installing ? 'Installing dsh…' : 'Starting DeepSeek Harness Web UI…')
+        startBtn.textContent = stopping ? 'Stopping…' : (installing ? 'Installing…' : 'Starting…')
         startBtn.disabled = true
       } else {
         stopElapsed()
@@ -550,9 +550,9 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
             await actionStop()
             await actionStart()
           } else {
-            // A start may be in flight with the old mode: interrupt it so the
-            // new mode takes effect on the next Start.
-            if (st.starting) await actionStop()
+            // A start or install may be in flight with the old mode: interrupt
+            // it so the new mode takes effect on the next Start.
+            if (st.starting || st.installing) await actionStop()
             await applyMode(message.value)
           }
         }
@@ -639,6 +639,7 @@ export class DshPanelProvider implements vscode.WebviewViewProvider {
         running: false,
         starting: false,
         installing: false,
+        stopping: false,
         checking: false,
         url: '',
         node: 'unknown',
