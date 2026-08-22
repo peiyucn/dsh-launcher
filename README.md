@@ -14,8 +14,7 @@ Start **DeepSeek Harness** (dsh) inside VS Code and open its web UI in the built
 
 ## Principles
 
-* **Loose coupling** — the extension only starts dsh through its public entry point (a launcher-managed pnpm install or a source checkout) and opens the web UI, never depending on dsh internals — so the dsh plugins you configure keep working as-is.
-* **Resilient to fast change** — it launches with the official command and reads only stable `~/.dsh` data, so it keeps working across upgrades.
+* **Loose coupling** — the extension starts dsh only through its public entry points (a launcher-managed pnpm install or a source checkout), reads only the stable `~/.dsh` data, and never depends on dsh internals — so your dsh plugins keep working as-is, and the launcher keeps working across dsh upgrades.
 
 ## Features
 
