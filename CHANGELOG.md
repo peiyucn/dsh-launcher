@@ -2,15 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.2.0]
 
 - Source mode: a freshly cloned checkout is set up (`pnpm install` + build) automatically — the extra "Setup now?" prompt right after the clone is gone (existing checkouts still ask before being set up).
 - Source mode builds the web UI with dsh's official client profile, so the top-left shows the same DeepSeek Harness brand as the packaged dsh instead of "DSH Local Build <commit>"; a checkout built before this change is rebuilt once automatically.
-- The managed dirs (package/source/logs) now default to `<home>/.dsh-launcher-panel` (`%USERPROFILE%\.dsh-launcher-panel` on Windows) instead of the platform data dir (`%LOCALAPPDATA%` / Library/Application Support / XDG data home), where enterprise policies can block writes.
+- The managed dirs (package/source/logs) now default to `<home>/.dsh-launcher-panel` (`%USERPROFILE%\.dsh-launcher-panel` on Windows) instead of the platform data dir (`%LOCALAPPDATA%` / Library/Application Support / XDG data home), where enterprise policies can block writes; the pkg install folder is named `package`, mirroring the `source` checkout.
 - Choosing the install location on first install now writes it into `dsh.pkgPath` / `dsh.path` even when the default location is chosen, so the actual path is visible in Settings and stays pinned if the managed default ever changes.
 - The DeepSeek pricing pill follows the updated peak/off-peak rule: weekends (Beijing time) are billed at the off-peak rate all day, effective 2026-08-23 00:00 Beijing time.
-
-## [0.1.6]
+- Stop now terminates in-flight setup commands (clone / install / build); stopping during a start no longer deadlocks later starts or briefly reports the server as running.
+- Added a `DSH Launcher Panel: Stop` command so the server can also be stopped from the command palette.
 
 - The panel now distinguishes Installing (first-run setup) / Starting / Stopping states, driven by an explicit server lifecycle state machine (the internal `starting`/`stopRequested` flags are gone).
 - pkg run mode (default) installs dsh into a launcher-managed directory via `pnpm install` and runs `pnpm exec dsh web`, approving build scripts non-interactively (the same thing npm does by default). npx was dropped because npm's peer resolver hangs on dsh's dependency graph.
@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
 - The panel shows status + dsh version (with Update and Check update buttons) + install + data together at the top (the separate Requirements card is gone); node and launcher versions sit at the bottom.
 - The Start button reads "Install & Start" when dsh isn't installed yet.
 - Update is unified across modes (pkg reinstalls the latest, source pulls the checkout).
-- Log files live in `%LOCALAPPDATA%\dsh-launcher-panel\logs` alongside the managed install/source dirs (previously under %TEMP%).
+- Log files live in the managed `logs` folder alongside the package/source dirs (previously under %TEMP%).
 - When pnpm is missing, Start installs it automatically without prompting; the DeepSeek API Status card shows model names without the trailing "api".
 - Fixed: source-mode setup counts as "starting"; Stop during setup is honoured; `--no-open` is decided from the exact version being run.
 - Tests are TypeScript (run via tsx against the source directly).
