@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- Source mode: a freshly cloned checkout is set up (`pnpm install` + build) automatically — the extra "Setup now?" prompt right after the clone is gone (existing checkouts still ask before being set up).
+
 ## [0.1.6]
 
 - The panel now distinguishes Installing (first-run setup) / Starting / Stopping states, driven by an explicit server lifecycle state machine (the internal `starting`/`stopRequested` flags are gone).

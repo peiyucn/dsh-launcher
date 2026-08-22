@@ -564,10 +564,17 @@ function findSourceCheckout(cfg: DshConfig): string | undefined {
   return isDshCheckout(managed) ? managed : undefined
 }
 
+/** A source checkout resolved for a start: its path, and whether this start cloned it. */
+interface SourceCheckout {
+  path: string
+  /** This start cloned the checkout (first install), so setup should follow without asking. */
+  cloned: boolean
+}
+
 /** Make sure a source checkout exists: reuse one, or clone deepseek-harness into the managed dir. */
-async function ensureSourceCheckout(cfg: DshConfig): Promise<string | undefined> {
+async function ensureSourceCheckout(cfg: DshConfig): Promise<SourceCheckout | undefined> {
   const existing = findSourceCheckout(cfg)
-  if (existing) return existing
+  if (existing) return { path: existing, cloned: false }
   // Nothing cloned yet: let the user pick the default or a custom location.
   const chosen = await chooseInstallDir('source', managedSourceDir())
   if (!chosen) return undefined
@@ -582,7 +589,7 @@ async function ensureSourceCheckout(cfg: DshConfig): Promise<string | undefined>
     return undefined
   }
   addActivity('✓ deepseek-harness cloned')
-  return chosen
+  return { path: chosen, cloned: true }
 }
 
 /** Detect the local dsh version: a source checkout (source mode), else the managed install. */
@@ -946,22 +953,31 @@ function checkoutDepsStale(checkout: string): boolean {
   }
 }
 
-/** Prompt to set up a fresh checkout, then run `pnpm install` + `pnpm run build`. */
-async function ensureCheckoutReady(checkout: string): Promise<boolean> {
+/**
+ * Make a checkout runnable: install its deps when missing/stale, then build
+ * the web client. A checkout this start just cloned (`freshClone`) is set up
+ * automatically — the user already committed to the install by starting it,
+ * so a second "setup?" prompt right after the clone only slows them down.
+ */
+async function ensureCheckoutReady(checkout: string, freshClone = false): Promise<boolean> {
   const stale = checkoutDepsStale(checkout)
   if (checkoutReady(checkout) && !stale) return true
-  const pick = await vscode.window.showInformationMessage(
-    stale
-      ? 'This deepseek-harness checkout has outdated dependencies. Run `pnpm install` and `pnpm run build`?'
-      : 'This deepseek-harness checkout is not set up. Run `pnpm install` and `pnpm run build`?',
-    'Setup now',
-    'Cancel',
-  )
-  if (pick !== 'Setup now') {
-    // The setup prompt was dismissed: say so in the console instead of
-    // silently stopping after "Node.js detected".
-    addActivity('✗ Setup declined — the checkout needs pnpm install + build before dsh can start')
-    return false
+  if (!freshClone) {
+    const pick = await vscode.window.showInformationMessage(
+      stale
+        ? 'This deepseek-harness checkout has outdated dependencies. Run `pnpm install` and `pnpm run build`?'
+        : 'This deepseek-harness checkout is not set up. Run `pnpm install` and `pnpm run build`?',
+      'Setup now',
+      'Cancel',
+    )
+    if (pick !== 'Setup now') {
+      // The setup prompt was dismissed: say so in the console instead of
+      // silently stopping after "Node.js detected".
+      addActivity('✗ Setup declined — the checkout needs pnpm install + build before dsh can start')
+      return false
+    }
+  } else {
+    addActivity('ℹ Fresh clone — running the one-time setup (pnpm install + build) automatically')
   }
   // The phase is already 'starting' (set at the top of ensureRunningUnlocked),
   // so setup needs no extra flag handling — the panel spinner is driven by it.
@@ -1010,16 +1026,16 @@ async function ensureRunningUnlocked(cfg: DshConfig): Promise<boolean> {
   }
 
   if (cfg.mode === 'source') {
-    const repoPath = await ensureSourceCheckout(cfg)
-    if (!repoPath) return false
-    if (!(await ensureCheckoutReady(repoPath))) {
+    const checkout = await ensureSourceCheckout(cfg)
+    if (!checkout) return false
+    if (!(await ensureCheckoutReady(checkout.path, checkout.cloned))) {
       dshState = 'missing'
       return false
     }
     // Setup may have run while the user pressed Stop; honour that request
     // instead of starting a server nobody is waiting for.
     if (serverPhase !== 'starting') return false
-    spawnSource(repoPath, cfg, dshVersion)
+    spawnSource(checkout.path, cfg, dshVersion)
     return waitForPort(cfg)
   }
 
